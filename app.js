@@ -27,6 +27,9 @@ let DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],noti
 let CATS=["Estructuras","Instalaciones","Costos y Presupuestos","Topografía","Diseño CAD","Normatividad","Sustentabilidad","Gestión de Obra"];
 const NIVELES=["Básico","Intermedio","Avanzado"];
 const ESTADOS=["Publicado","Borrador"];
+/* estado de búsqueda / filtros / paginación */
+let _search={}, _page={}, _filterCat='Todos', _filterEstado='Todos';
+const PER_PAGE=8;
 
 /* ====== NAV ====== */
 const NAV=[
@@ -80,6 +83,100 @@ function renderDashboard(){
 }
 function statCard(label,val,icon){return `<div class="stat"><div class="top"><div class="si"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${icon}"/></svg></div></div><b>${val}</b><span>${label}</span></div>`;}
 
+/* ====== INFRA DE LISTAS: búsqueda + filtros + paginación ====== */
+const ROWCFG={
+  cursos:{key:'cursos',fields:c=>[c.titulo,c.categoria,c.instructor],row:cursoRow},
+  webinars:{key:'webinars',fields:w=>[w.titulo,w.fecha],row:webinarRow},
+  noticias:{key:'noticias',fields:n=>[n.titulo,n.fuente],row:noticiaRow},
+  material:{key:'material',fields:m=>[m.titulo,m.desc],row:materialRow},
+  miembros:{key:'miembros',fields:m=>[m.nombre,m.email,m.ciudad],row:miembroRow},
+  foro:{key:'foro',fields:t=>[t.titulo,t.autor],row:foroRow},
+};
+function getList(sec){
+  const cfg=ROWCFG[sec]; let list=DATA[cfg.key]||[];
+  const q=(_search[sec]||'').toLowerCase().trim();
+  if(q)list=list.filter(it=>cfg.fields(it).join(' ').toLowerCase().includes(q));
+  if(sec==='cursos')list=list.filter(c=>(_filterCat==='Todos'||c.categoria===_filterCat)&&(_filterEstado==='Todos'||(c.estado||'Publicado')===_filterEstado));
+  const total=list.length, pages=Math.max(1,Math.ceil(total/PER_PAGE));
+  const page=Math.min(_page[sec]||1,pages); _page[sec]=page;
+  return {pageItems:list.slice((page-1)*PER_PAGE,page*PER_PAGE),total,pages,page};
+}
+function rowsHTML(sec){
+  const cfg=ROWCFG[sec]; const {pageItems,total}=getList(sec);
+  if(!pageItems.length)return `<tr><td colspan="20"><div class="empty"><b>${total?'Sin resultados':'Aún no hay registros'}</b><span>${total?'Prueba con otra búsqueda o filtro.':'Crea el primero con el botón de arriba.'}</span></div></td></tr>`;
+  return pageItems.map(cfg.row).join('');
+}
+function pagerInner(sec){
+  const {total,pages,page}=getList(sec); if(pages<=1)return total?`<div class="pager"><span style="color:var(--muted);font-size:.85rem">${total} registro(s)</span><span></span></div>`:'';
+  return `<div class="pager"><span style="color:var(--muted);font-size:.85rem">${total} registros · página ${page} de ${pages}</span><div style="display:flex;gap:8px"><button onclick="setPage('${sec}',-1)" ${page<=1?'disabled':''}>Anterior</button><button onclick="setPage('${sec}',1)" ${page>=pages?'disabled':''}>Siguiente</button></div></div>`;
+}
+function rebuildRows(){const b=document.getElementById('tbl-body');if(!b)return;b.innerHTML=rowsHTML(currentSection);const p=document.getElementById('tbl-pager');if(p)p.innerHTML=pagerInner(currentSection);}
+function onSearch(sec,v){_search[sec]=v;_page[sec]=1;rebuildRows();}
+function setPage(sec,d){_page[sec]=(_page[sec]||1)+d;rebuildRows();}
+function setCatFilter(c){_filterCat=c;_page.cursos=1;renderSection('cursos');}
+function setEstadoFilter(e){_filterEstado=e;_page.cursos=1;renderSection('cursos');}
+function searchBar(sec,ph){return `<div class="search-admin"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg><input value="${esc(_search[sec]||'')}" oninput="onSearch('${sec}',this.value)" placeholder="${ph}"></div>`;}
+function listSection(sec,o){
+  const add=o.addFn?`<button class="btn-add" onclick="${o.addFn}"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>${o.addLabel}</button>`:'';
+  return `<div class="page-head"><div><h1 class="page-h">${o.title}</h1><p class="page-sub">${o.sub}</p></div>${add}</div>
+    ${searchBar(sec,o.search||'Buscar...')}
+    <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>${o.head.map(h=>`<th>${h}</th>`).join('')}<th></th></tr></thead>
+    <tbody id="tbl-body">${rowsHTML(sec)}</tbody></table></div><div id="tbl-pager">${pagerInner(sec)}</div></div>`;
+}
+
+/* ====== ROW FUNCTIONS ====== */
+function cursoRow(c){const est=(c.estado||'Publicado')==='Borrador';return `<tr>
+  <td><div class="t-cell"><div class="t-thumb" style="background-image:url('${c.img||''}')"></div><span class="t-title">${c.titulo}</span></div></td>
+  <td><span class="tag">${c.categoria||'—'}</span></td>
+  <td>${c.nivel||'—'}</td>
+  <td>${(c.listaClases?c.listaClases.length:c.clases)||0}</td>
+  <td>${est?'<span class="tag gray">Borrador</span>':'<span class="tag green">Publicado</span>'}</td>
+  <td>${c.dripDias?`<span class="tag gray">En ${c.dripDias} días</span>`:'<span class="tag green">Abierto</span>'}</td>
+  <td><div class="row-actions">
+    <button class="ico-btn" onclick="previewCurso('${c.id}')" title="Vista previa"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+    <button class="ico-btn" onclick="duplicarCurso('${c.id}')" title="Duplicar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+    <button class="ico-btn" onclick="editItem('cursos','${c.id}')" title="Editar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+    <button class="ico-btn del" onclick="delItem('cursos','${c.id}')" title="Eliminar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+  </div></td></tr>`;}
+function webinarRow(w){return `<tr><td class="t-title">${w.titulo}</td><td>${w.fecha||'—'}</td>
+  <td>${w.grabacion?'<span class="tag green">Con grabación</span>':'<span class="tag gray">En vivo</span>'}</td>
+  <td>${actions('webinars',w.id)}</td></tr>`;}
+function noticiaRow(n){return `<tr><td><div class="t-cell"><div class="t-thumb" style="background-image:url('${n.img||''}')"></div><span class="t-title">${n.titulo}</span></div></td>
+  <td><span class="tag">${n.fuente||'IMDAC'}</span></td><td>${n.fecha||'—'}</td><td>${actions('noticias',n.id)}</td></tr>`;}
+function materialRow(m){return `<tr><td class="t-title">📄 ${m.titulo}</td><td>${m.desc||'—'}</td><td>${actions('material',m.id)}</td></tr>`;}
+function miembroRow(m){return `<tr>
+  <td><div class="t-cell"><div class="t-thumb" style="border-radius:9px;background:var(--rojo);color:#fff;display:grid;place-items:center;font-weight:700;font-family:var(--font-display)">${(m.nombre||'U')[0].toUpperCase()}</div><span class="t-title">${m.nombre||'—'}</span></div></td>
+  <td>${m.email||'—'}</td><td>${m.ciudad||'—'}</td><td><span class="tag green">Activo</span></td>
+  <td><div class="row-actions"><button class="ico-btn" onclick="verMiembro('${m.id}')" title="Ver"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+  <button class="ico-btn del" onclick="delItem('miembros','${m.id}')" title="Eliminar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></td></tr>`;}
+function foroRow(t){return `<tr><td class="t-title">${t.titulo}</td><td>${t.autor||'—'}</td><td><span class="tag">${t.tag||'General'}</span></td>
+  <td>❤️ ${t.likes||0} · 👁 ${t.vistas||0}</td>
+  <td><div class="row-actions"><button class="ico-btn del" onclick="delItem('foro','${t.id}')" title="Eliminar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></td></tr>`;}
+
+/* ====== DUPLICAR + VISTA PREVIA ====== */
+function duplicarCurso(id){
+  const c=DATA.cursos.find(x=>x.id===id);if(!c)return;
+  const copy=JSON.parse(JSON.stringify(c));delete copy.id;copy.titulo=(c.titulo||'Curso')+' (copia)';
+  saveDoc('cursos',null,copy);toast('Curso duplicado');
+}
+function previewCurso(id){
+  const c=DATA.cursos.find(x=>x.id===id);if(!c)return;
+  const total=c.listaClases?c.listaClases.length:(c.clases||0);
+  const clases=c.listaClases&&c.listaClases.length?c.listaClases:Array.from({length:total},(_,i)=>({titulo:'Clase '+(i+1),duracion:'2 Horas'}));
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-head"><h3>Vista previa · como lo ve el miembro</h3><button class="modal-x" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="pv-hero"><div class="pv-img" style="background-image:url('${c.img||''}')"></div>
+        <div class="pv-body"><div class="pv-cat">${c.categoria||'General'}</div><h3>${c.titulo}</h3>
+          <p class="pv-desc">${c.desc||'Capacitación profesional IMDAC.'}</p><span class="tag">${total} clases · ${c.nivel||'Intermedio'}</span></div></div>
+      <div class="pv-progress"><span>Tu progreso</span><div class="pv-bar"><i style="width:0%"></i></div><b>0%</b></div>
+      <div style="font-family:var(--font-display);font-weight:700;margin:16px 0 10px">Lista de clases</div>
+      ${clases.length?clases.map((cl,i)=>`<div class="pv-clase"><div class="pv-cnum">${i+1}</div><div style="flex:1"><b>${cl.titulo||('Clase '+(i+1))}</b><div style="color:var(--muted);font-size:.82rem">⏱ ${cl.duracion||'2 Horas'}</div></div><div class="pv-play">▶</div></div>`).join(''):'<p style="color:var(--muted)">Sin clases aún.</p>'}
+      <div class="modal-foot"><button class="btn-ghost" onclick="closeModal()">Cerrar</button></div>
+    </div>`;
+  document.getElementById('modal').classList.add('open');
+}
+
 /* ====== CRUD GENÉRICO (webinars, noticias, material) ====== */
 function tableShell(title,sub,addLabel,addFn,head,rows){
   return `<div class="page-head"><div><h1 class="page-h">${title}</h1><p class="page-sub">${sub}</p></div>
@@ -94,15 +191,15 @@ function actions(coll,id){return `<div class="row-actions">
 
 /* ====== CURSOS ====== */
 function renderCursos(){
-  const rows=DATA.cursos.map(c=>`<tr>
-    <td><div class="t-cell"><div class="t-thumb" style="background-image:url('${c.img||''}')"></div><span class="t-title">${c.titulo}</span></div></td>
-    <td><span class="tag">${c.categoria||'—'}</span></td>
-    <td>${c.nivel||'—'}</td>
-    <td>${(c.listaClases?c.listaClases.length:c.clases)||0}</td>
-    <td>${c.dripDias?`<span class="tag gray">En ${c.dripDias} días</span>`:'<span class="tag green">Abierto</span>'}</td>
-    <td>${actions('cursos',c.id)}</td></tr>`).join('');
-  return tableShell('Cursos','Gestiona el catálogo y las clases de cada curso.','Nuevo curso','newCurso()',
-    ['Curso','Categoría','Nivel','Clases','Goteo'],rows);
+  const catChips=['Todos',...CATS].map(c=>`<button class="chip ${_filterCat===c?'active':''}" onclick="setCatFilter('${c.replace(/'/g,"\\'")}')">${c}</button>`).join('');
+  const estChips=['Todos','Publicado','Borrador'].map(e=>`<button class="chip ${_filterEstado===e?'active':''}" onclick="setEstadoFilter('${e}')">${e}</button>`).join('');
+  return `<div class="page-head"><div><h1 class="page-h">Cursos</h1><p class="page-sub">Gestiona el catálogo y las clases de cada curso.</p></div>
+    <button class="btn-add" onclick="newCurso()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>Nuevo curso</button></div>
+    ${searchBar('cursos','Buscar curso por título, categoría o instructor...')}
+    <div class="chips-row">${catChips}</div>
+    <div class="chips-row" style="margin-bottom:18px">${estChips}</div>
+    <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>${['Curso','Categoría','Nivel','Clases','Estado','Goteo'].map(h=>`<th>${h}</th>`).join('')}<th></th></tr></thead>
+    <tbody id="tbl-body">${rowsHTML('cursos')}</tbody></table></div><div id="tbl-pager">${pagerInner('cursos')}</div></div>`;
 }
 function cursoForm(c={}){
   const clases=c.listaClases||[];
@@ -129,13 +226,23 @@ function addCategoria(){
   const n=prompt('Nombre de la nueva categoría:');
   if(n&&n.trim()){CATS.push(n.trim());const sel=document.getElementById('f-categoria');const o=document.createElement('option');o.textContent=n.trim();o.selected=true;sel.appendChild(o);}
 }
-function claseEditRow(cl={},i){return `<div class="clase-edit" data-clase>
+function claseEditRow(cl={},i){return `<div class="clase-edit" data-clase draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondragend="dragEnd(event)">
+  <span class="grip" title="Arrastra para reordenar">⠿</span>
   <span class="num">${i+1}</span>
   <input data-cl="titulo" value="${esc(cl.titulo)}" placeholder="Título de la clase">
   <input data-cl="duracion" value="${esc(cl.duracion)||'2 Horas'}" placeholder="Duración" style="max-width:110px">
   <input data-cl="videoUrl" value="${esc(cl.videoUrl)}" placeholder="URL Google Drive" style="max-width:170px">
   <button class="rm" onclick="this.parentElement.remove();renumClases()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
 </div>`;}
+let _dragEl=null;
+function dragStart(e){_dragEl=e.currentTarget;e.currentTarget.classList.add('dragging');}
+function dragEnd(e){e.currentTarget.classList.remove('dragging');_dragEl=null;renumClases();}
+function dragOver(e){
+  e.preventDefault();const t=e.currentTarget;if(!_dragEl||t===_dragEl)return;
+  const list=t.parentElement,items=[...list.children];
+  if(items.indexOf(t)<items.indexOf(_dragEl))list.insertBefore(_dragEl,t);
+  else list.insertBefore(_dragEl,t.nextSibling);
+}
 function addClaseRow(){const l=document.getElementById('clases-list');l.insertAdjacentHTML('beforeend',claseEditRow({},l.children.length));}
 function renumClases(){document.querySelectorAll('#clases-list .clase-edit').forEach((r,i)=>r.querySelector('.num').textContent=i+1);}
 function collectClases(){return [...document.querySelectorAll('#clases-list .clase-edit')].map(r=>({titulo:r.querySelector('[data-cl="titulo"]').value,duracion:r.querySelector('[data-cl="duracion"]').value,videoUrl:r.querySelector('[data-cl="videoUrl"]').value}));}
@@ -148,13 +255,7 @@ function saveCurso(id){
 }
 
 /* ====== WEBINARS ====== */
-function renderWebinars(){
-  const rows=DATA.webinars.map(w=>`<tr>
-    <td class="t-title">${w.titulo}</td><td>${w.fecha||'—'}</td>
-    <td>${w.grabacion?'<span class="tag green">Con grabación</span>':'<span class="tag gray">En vivo</span>'}</td>
-    <td>${actions('webinars',w.id)}</td></tr>`).join('');
-  return tableShell('Webinars','Programa sesiones en vivo y sube grabaciones.','Nuevo webinar','newWebinar()',['Título','Fecha','Estado'],rows);
-}
+function renderWebinars(){return listSection('webinars',{title:'Webinars',sub:'Programa sesiones en vivo y sube grabaciones.',addLabel:'Nuevo webinar',addFn:'newWebinar()',head:['Título','Fecha','Estado'],search:'Buscar webinar...'});}
 function webinarForm(w={}){return `<div class="form-grid">
   <div class="field form-full"><label>Título</label><input id="f-titulo" value="${esc(w.titulo)}"></div>
   <div class="field"><label>Fecha (texto visible)</label><input id="f-fecha" value="${esc(w.fecha)}" placeholder="15 jun 2026, 18:00"></div>
@@ -166,13 +267,7 @@ function newWebinar(){openForm('Nuevo webinar',webinarForm(),()=>saveWebinar(nul
 function saveWebinar(id){const d={titulo:fv('f-titulo'),fecha:fv('f-fecha'),fechaISO:fv('f-fechaISO'),grabacion:fv('f-grabacion'),img:fv('f-img')};if(!d.titulo)return toast('El título es obligatorio');saveDoc('webinars',id,d);}
 
 /* ====== NOTICIAS ====== */
-function renderNoticias(){
-  const rows=DATA.noticias.map(n=>`<tr>
-    <td><div class="t-cell"><div class="t-thumb" style="background-image:url('${n.img||''}')"></div><span class="t-title">${n.titulo}</span></div></td>
-    <td><span class="tag">${n.fuente||'IMDAC'}</span></td><td>${n.fecha||'—'}</td>
-    <td>${actions('noticias',n.id)}</td></tr>`).join('');
-  return tableShell('Noticias','Publica novedades del sector de la construcción.','Nueva noticia','newNoticia()',['Noticia','Fuente','Fecha'],rows);
-}
+function renderNoticias(){return listSection('noticias',{title:'Noticias',sub:'Publica novedades del sector de la construcción.',addLabel:'Nueva noticia',addFn:'newNoticia()',head:['Noticia','Fuente','Fecha'],search:'Buscar noticia...'});}
 function noticiaForm(n={}){return `<div class="form-grid">
   <div class="field form-full"><label>Título</label><input id="f-titulo" value="${esc(n.titulo)}"></div>
   <div class="field"><label>Fuente</label><input id="f-fuente" value="${esc(n.fuente)||'IMDAC'}"></div>
@@ -185,12 +280,7 @@ function newNoticia(){openForm('Nueva noticia',noticiaForm(),()=>saveNoticia(nul
 function saveNoticia(id){const d={titulo:fv('f-titulo'),fuente:fv('f-fuente'),fecha:fv('f-fecha'),resumen:fv('f-resumen'),img:fv('f-img'),url:fv('f-url')};if(!d.titulo)return toast('El título es obligatorio');saveDoc('noticias',id,d);}
 
 /* ====== MATERIAL ====== */
-function renderMaterial(){
-  const rows=DATA.material.map(m=>`<tr>
-    <td class="t-title">📄 ${m.titulo}</td><td>${m.desc||'—'}</td>
-    <td>${actions('material',m.id)}</td></tr>`).join('');
-  return tableShell('Material PDF','Sube guías, planos tipo y documentos descargables.','Nuevo material','newMaterial()',['Título','Descripción'],rows);
-}
+function renderMaterial(){return listSection('material',{title:'Material PDF',sub:'Sube guías, planos tipo y documentos descargables.',addLabel:'Nuevo material',addFn:'newMaterial()',head:['Título','Descripción'],search:'Buscar material...'});}
 function materialForm(m={}){return `<div class="form-grid">
   <div class="field form-full"><label>Título</label><input id="f-titulo" value="${esc(m.titulo)}"></div>
   <div class="field form-full"><label>Descripción</label><textarea id="f-desc" rows="2">${esc(m.desc)}</textarea></div>
@@ -200,15 +290,7 @@ function newMaterial(){openForm('Nuevo material',materialForm(),()=>saveMaterial
 function saveMaterial(id){const d={titulo:fv('f-titulo'),desc:fv('f-desc'),url:fv('f-url')};if(!d.titulo)return toast('El título es obligatorio');saveDoc('material',id,d);}
 
 /* ====== MIEMBROS ====== */
-function renderMiembros(){
-  const rows=DATA.miembros.map(m=>`<tr>
-    <td><div class="t-cell"><div class="t-thumb" style="border-radius:9px;background:var(--rojo);color:#fff;display:grid;place-items:center;font-weight:700;font-family:var(--font-display)">${(m.nombre||'U')[0].toUpperCase()}</div><span class="t-title">${m.nombre||'—'}</span></div></td>
-    <td>${m.email||'—'}</td><td>${m.ciudad||'—'}</td><td><span class="tag green">Activo</span></td>
-    <td><div class="row-actions"><button class="ico-btn" onclick="verMiembro('${m.id}')" title="Ver"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
-    <button class="ico-btn del" onclick="delItem('miembros','${m.id}')" title="Eliminar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></td></tr>`).join('');
-  return tableShell('Miembros','Consulta y administra los miembros del club.','',`toast('Los miembros se registran desde el Club')`,['Miembro','Correo','Ciudad','Estado'],rows)
-    .replace(/<button class="btn-add"[^>]*>.*?<\/button>/,'');
-}
+function renderMiembros(){return listSection('miembros',{title:'Miembros',sub:'Consulta y administra los miembros del club.',head:['Miembro','Correo','Ciudad','Estado'],search:'Buscar por nombre, correo o ciudad...'});}
 function verMiembro(id){
   const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
   document.getElementById('modal-content').innerHTML=`
@@ -228,14 +310,7 @@ function verMiembro(id){
 }
 
 /* ====== FORO (moderación) ====== */
-function renderForo(){
-  const rows=DATA.foro.map(t=>`<tr>
-    <td class="t-title">${t.titulo}</td><td>${t.autor||'—'}</td><td><span class="tag">${t.tag||'General'}</span></td>
-    <td>❤️ ${t.likes||0} · 👁 ${t.vistas||0}</td>
-    <td><div class="row-actions"><button class="ico-btn del" onclick="delItem('foro','${t.id}')" title="Eliminar tema"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></td></tr>`).join('');
-  return tableShell('Foro','Modera los temas publicados por la comunidad.','',`toast('Los temas los crean los miembros')`,['Tema','Autor','Categoría','Interacción'],rows)
-    .replace(/<button class="btn-add"[^>]*>.*?<\/button>/,'');
-}
+function renderForo(){return listSection('foro',{title:'Foro',sub:'Modera los temas publicados por la comunidad.',head:['Tema','Autor','Categoría','Interacción'],search:'Buscar tema o autor...'});}
 
 /* ====== NOTIFICACIONES ====== */
 const NOTIF_TIPOS=[['📢','Anuncio'],['📚','Nuevo curso'],['🎥','Webinar'],['📄','Material'],['🏷️','Promoción']];
