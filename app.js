@@ -24,8 +24,9 @@ try{
 
 let CURRENT_USER=null;
 let DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[]};
-const CATS=["Estructuras","Instalaciones","Costos y Presupuestos","Topografía","Diseño CAD","Normatividad","Sustentabilidad","Gestión de Obra"];
+let CATS=["Estructuras","Instalaciones","Costos y Presupuestos","Topografía","Diseño CAD","Normatividad","Sustentabilidad","Gestión de Obra"];
 const NIVELES=["Básico","Intermedio","Avanzado"];
+const ESTADOS=["Publicado","Borrador"];
 
 /* ====== NAV ====== */
 const NAV=[
@@ -107,18 +108,26 @@ function cursoForm(c={}){
   const clases=c.listaClases||[];
   return `
   <div class="form-grid">
-    <div class="field form-full"><label>Título del curso</label><input id="f-titulo" value="${esc(c.titulo)}" placeholder="Ej. Diseño Estructural de Concreto"></div>
-    <div class="field"><label>Categoría</label><select id="f-categoria">${CATS.map(x=>`<option ${c.categoria===x?'selected':''}>${x}</option>`).join('')}</select></div>
-    <div class="field"><label>Nivel</label><select id="f-nivel">${NIVELES.map(x=>`<option ${c.nivel===x?'selected':''}>${x}</option>`).join('')}</select></div>
-    <div class="field"><label>Liberación por goteo (días)</label><input id="f-drip" type="number" value="${c.dripDias||0}" placeholder="0 = abierto ya"></div>
-    <div class="field"><label>Imagen (URL)</label><input id="f-img" value="${esc(c.img)}" placeholder="https://..."></div>
+    <div class="field form-full"><label>Nombre del curso</label><input id="f-titulo" value="${esc(c.titulo)}" placeholder="Ej. Diseño Estructural de Concreto"></div>
     <div class="field form-full"><label>Descripción</label><textarea id="f-desc" rows="3">${esc(c.desc)}</textarea></div>
+    <div class="field"><label style="display:flex;justify-content:space-between">Categoría <a onclick="addCategoria()" style="color:var(--rojo);font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0">+ Nueva</a></label><select id="f-categoria">${CATS.map(x=>`<option ${c.categoria===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="field"><label>Nivel</label><select id="f-nivel">${NIVELES.map(x=>`<option ${c.nivel===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="field"><label>Instructor</label><input id="f-instructor" value="${esc(c.instructor)}" placeholder="Ej. Arq. Nombre"></div>
+    <div class="field"><label>Estado</label><select id="f-estado">${ESTADOS.map(x=>`<option ${c.estado===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="field form-full"><label>Liberación por goteo (días desde registro del socio)</label><input id="f-drip" type="number" value="${c.dripDias||0}" placeholder="0">
+      <p style="color:var(--muted);font-size:.82rem;margin-top:6px">Si el valor es 0, el curso se desbloquea desde que el socio se registra. Si es 13, se desbloquea 13 días después.</p></div>
+    <div class="field form-full"><label>📄 Temario del curso (Google Drive)</label><input id="f-temario" value="${esc(c.temario)}" placeholder="https://drive.google.com/file/d/..."></div>
+    <div class="field form-full"><label>🖼️ Imagen de portada (Google Drive)</label><input id="f-img" value="${esc(c.img)}" placeholder="https://drive.google.com/file/d/..."></div>
   </div>
   <div class="form-full" style="margin-top:8px">
     <label style="display:block;font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px">Clases del curso</label>
     <div id="clases-list">${clases.map((cl,i)=>claseEditRow(cl,i)).join('')}</div>
     <button class="btn-add-clase" onclick="addClaseRow()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 4v16m8-8H4"/></svg>Agregar clase</button>
   </div>`;
+}
+function addCategoria(){
+  const n=prompt('Nombre de la nueva categoría:');
+  if(n&&n.trim()){CATS.push(n.trim());const sel=document.getElementById('f-categoria');const o=document.createElement('option');o.textContent=n.trim();o.selected=true;sel.appendChild(o);}
 }
 function claseEditRow(cl={},i){return `<div class="clase-edit" data-clase>
   <span class="num">${i+1}</span>
@@ -133,7 +142,7 @@ function collectClases(){return [...document.querySelectorAll('#clases-list .cla
 function newCurso(){openForm('Nuevo curso',cursoForm(),()=>saveCurso(null));}
 function saveCurso(id){
   const clases=collectClases();
-  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),dripDias:+fv('f-drip')||0,img:fv('f-img'),desc:fv('f-desc'),listaClases:clases,clases:clases.length};
+  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),instructor:fv('f-instructor'),estado:fv('f-estado'),dripDias:+fv('f-drip')||0,temario:fv('f-temario'),img:fv('f-img'),desc:fv('f-desc'),listaClases:clases,clases:clases.length};
   if(!data.titulo)return toast('El título es obligatorio');
   saveDoc('cursos',id,data);
 }
