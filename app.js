@@ -224,7 +224,7 @@ function cursoForm(c={}){
 }
 function addCategoria(){
   const n=prompt('Nombre de la nueva categoría:');
-  if(n&&n.trim()){CATS.push(n.trim());const sel=document.getElementById('f-categoria');const o=document.createElement('option');o.textContent=n.trim();o.selected=true;sel.appendChild(o);}
+  if(n&&n.trim()){const v=n.trim();if(CATS.includes(v)){toast('Ya existe');return;}CATS.push(v);const sel=document.getElementById('f-categoria');const o=document.createElement('option');o.textContent=v;o.selected=true;sel.appendChild(o);if(FB_OK)db.collection('config').doc('app').set({categorias:CATS},{merge:true});toast('Categoría agregada');}
 }
 function claseEditRow(cl={},i){return `<div class="clase-edit" data-clase draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondragend="dragEnd(event)">
   <span class="grip" title="Arrastra para reordenar">⠿</span>
@@ -340,6 +340,16 @@ function renderConfig(){
       <label class="toggle"><input type="checkbox" id="cfg-maint" onchange="saveMaint(this.checked)"><span class="tk"></span></label></div>
   </div>
   <div class="card" style="padding:26px;max-width:620px;margin-top:18px">
+    <h3 style="font-family:var(--font-display);font-size:1.1rem;margin-bottom:6px">Categorías de cursos</h3>
+    <p style="color:var(--muted);font-size:.86rem;margin-bottom:16px">Aparecen en el formulario de cursos y en los filtros del Club. Recuerda guardar.</p>
+    <div class="chips-row" id="cat-chips">${CATS.map((c,i)=>catChip(c,i)).join('')}</div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <input id="cat-new" placeholder="Nueva categoría" onkeydown="if(event.key==='Enter')addCatInput()" style="flex:1;padding:11px 14px;border:1.5px solid var(--line);border-radius:11px;background:var(--base);color:var(--text)">
+      <button class="btn-ghost" onclick="addCatInput()">Agregar</button>
+    </div>
+    <button class="btn-save" style="margin-top:16px" onclick="saveCats()">Guardar categorías</button>
+  </div>
+  <div class="card" style="padding:26px;max-width:620px;margin-top:18px">
     <h3 style="font-family:var(--font-display);font-size:1.1rem;margin-bottom:16px">Datos de contacto</h3>
     <div class="form-grid">
       <div class="field"><label>Cupón de descuento</label><input id="cfg-cupon" value="CLUB20IMDAC"></div>
@@ -351,6 +361,10 @@ function renderConfig(){
   </div>`;
 }
 function saveMaint(on){if(FB_OK)db.collection('config').doc('app').set({mantenimiento:on},{merge:true});toast(on?'Modo mantenimiento ACTIVADO':'Modo mantenimiento desactivado');}
+function catChip(c,i){return `<span class="cat-tag">${esc(c)}<button onclick="removeCat(${i})" title="Quitar">✕</button></span>`;}
+function addCatInput(){const v=document.getElementById('cat-new').value.trim();if(!v)return;if(CATS.includes(v))return toast('Esa categoría ya existe');CATS.push(v);document.getElementById('cat-chips').innerHTML=CATS.map((c,j)=>catChip(c,j)).join('');document.getElementById('cat-new').value='';}
+function removeCat(i){CATS.splice(i,1);document.getElementById('cat-chips').innerHTML=CATS.map((c,j)=>catChip(c,j)).join('');}
+function saveCats(){if(FB_OK)db.collection('config').doc('app').set({categorias:CATS},{merge:true}).then(()=>toast('Categorías guardadas')).catch(()=>toast('Error al guardar'));else toast('Categorías guardadas (demo)');}
 function saveContacto(){if(FB_OK)db.collection('config').doc('app').set({cupon:fv('cfg-cupon'),wa1:fv('cfg-wa1'),wa2:fv('cfg-wa2'),canal:fv('cfg-canal')},{merge:true});toast('Datos de contacto guardados');}
 
 /* ====== MODAL FORM (reusable) ====== */
@@ -426,6 +440,7 @@ async function loadData(){
     const foro=await db.collection('foro_temas').get();if(!foro.empty)DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
     const miem=await db.collection('miembros').get();if(!miem.empty)DATA.miembros=miem.docs.map(d=>{const x=d.data();return {id:d.id,...x,alta:x.creado?.toDate?x.creado.toDate().toLocaleDateString('es-MX'):'—'};});
     const notif=await db.collection('notificaciones').orderBy('fecha','desc').get();if(!notif.empty)DATA.notificaciones=notif.docs.map(d=>({id:d.id,...d.data()}));
+    const cfg=await db.collection('config').doc('app').get();if(cfg.exists&&Array.isArray(cfg.data().categorias)&&cfg.data().categorias.length)CATS=cfg.data().categorias;
   }catch(e){console.warn('Firestore:',e.message);}
 }
 
