@@ -194,8 +194,15 @@ table.tbl tr:hover td{background:var(--base)}
 .toggle input:checked + .tk{background:var(--rojo)}
 .toggle input:checked + .tk::before{transform:translateX(20px)}
 
-.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--negro);color:#fff;padding:14px 26px;border-radius:50px;font-weight:600;z-index:4000;box-shadow:var(--shadow-lg);transition:transform .35s cubic-bezier(.34,1.4,.4,1);font-size:.9rem}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(90px);background:var(--negro);color:#fff;padding:13px 18px 13px 16px;border-radius:14px;font-weight:600;z-index:4000;box-shadow:var(--shadow-lg);transition:transform .35s cubic-bezier(.34,1.4,.4,1);font-size:.9rem;display:flex;align-items:center;gap:12px;max-width:90vw}
 .toast.show{transform:translateX(-50%) translateY(0)}
+.toast .tic{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:.8rem;font-weight:700;flex-shrink:0;color:#fff}
+.toast .tic.ok{background:#16a34a}
+.toast .tic.err{background:var(--rojo)}
+.toast .tic.info{background:#3b82f6}
+.toast .undo{margin-left:6px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.14);color:#fff;font-weight:700;font-size:.82rem;transition:.16s}
+.toast .undo:hover{background:rgba(255,255,255,.26)}
+.btn-save:disabled{opacity:.7;cursor:not-allowed;transform:none}
 .emoji-pick{display:flex;gap:8px;flex-wrap:wrap}
 .emoji-pick button{width:46px;height:46px;border-radius:11px;border:1.5px solid var(--line);font-size:1.3rem;transition:.16s}
 .emoji-pick button.active{border-color:var(--rojo);background:var(--rojo-50)}

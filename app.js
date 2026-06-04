@@ -29,6 +29,7 @@ const NIVELES=["Básico","Intermedio","Avanzado"];
 const ESTADOS=["Publicado","Borrador"];
 /* estado de búsqueda / filtros / paginación */
 let _search={}, _page={}, _filterCat='Todos', _filterEstado='Todos';
+let _appCfg={};
 const PER_PAGE=8;
 
 /* ====== NAV ====== */
@@ -337,7 +338,7 @@ function renderConfig(){
   return `<div class="page-head"><div><h1 class="page-h">Configuración</h1><p class="page-sub">Ajustes globales del club.</p></div></div>
   <div class="card" style="padding:8px 26px;max-width:620px">
     <div class="cfg-item"><div class="ci-t"><b>Modo mantenimiento</b><span>Bloquea el acceso de miembros al Club mientras actualizas contenido</span></div>
-      <label class="toggle"><input type="checkbox" id="cfg-maint" onchange="saveMaint(this.checked)"><span class="tk"></span></label></div>
+      <label class="toggle"><input type="checkbox" id="cfg-maint" ${_appCfg.mantenimiento?'checked':''} onchange="saveMaint(this.checked)"><span class="tk"></span></label></div>
   </div>
   <div class="card" style="padding:26px;max-width:620px;margin-top:18px">
     <h3 style="font-family:var(--font-display);font-size:1.1rem;margin-bottom:6px">Categorías de cursos</h3>
@@ -350,22 +351,28 @@ function renderConfig(){
     <button class="btn-save" style="margin-top:16px" onclick="saveCats()">Guardar categorías</button>
   </div>
   <div class="card" style="padding:26px;max-width:620px;margin-top:18px">
-    <h3 style="font-family:var(--font-display);font-size:1.1rem;margin-bottom:16px">Datos de contacto</h3>
+    <h3 style="font-family:var(--font-display);font-size:1.1rem;margin-bottom:16px">Plan y contacto</h3>
     <div class="form-grid">
-      <div class="field"><label>Cupón de descuento</label><input id="cfg-cupon" value="CLUB20IMDAC"></div>
-      <div class="field"><label>WhatsApp soporte 1</label><input id="cfg-wa1" value="238 219 6286"></div>
-      <div class="field"><label>WhatsApp soporte 2</label><input id="cfg-wa2" value="236 111 2213"></div>
-      <div class="field"><label>Enlace canal WhatsApp</label><input id="cfg-canal" placeholder="https://chat.whatsapp.com/..."></div>
+      <div class="field"><label>Precio mensual (MXN)</label><input id="cfg-precio" type="number" value="${_appCfg.precio||499}"></div>
+      <div class="field"><label>Cupón de descuento</label><input id="cfg-cupon" value="${esc(_appCfg.cupon)||'CLUB20IMDAC'}"></div>
+      <div class="field"><label>WhatsApp soporte 1</label><input id="cfg-wa1" value="${esc(_appCfg.wa1)||'238 219 6286'}"></div>
+      <div class="field"><label>WhatsApp soporte 2</label><input id="cfg-wa2" value="${esc(_appCfg.wa2)||'236 111 2213'}"></div>
+      <div class="field form-full"><label>Enlace canal WhatsApp</label><input id="cfg-canal" value="${esc(_appCfg.canal)}" placeholder="https://chat.whatsapp.com/..."></div>
     </div>
-    <button class="btn-save" style="margin-top:18px" onclick="saveContacto()">Guardar contacto</button>
+    <button class="btn-save" style="margin-top:18px" onclick="saveContacto()">Guardar plan y contacto</button>
   </div>`;
 }
-function saveMaint(on){if(FB_OK)db.collection('config').doc('app').set({mantenimiento:on},{merge:true});toast(on?'Modo mantenimiento ACTIVADO':'Modo mantenimiento desactivado');}
+function saveMaint(on){_appCfg.mantenimiento=on;if(FB_OK)db.collection('config').doc('app').set({mantenimiento:on},{merge:true});toast(on?'Modo mantenimiento ACTIVADO':'Modo mantenimiento desactivado',{type:on?'info':'ok'});}
 function catChip(c,i){return `<span class="cat-tag">${esc(c)}<button onclick="removeCat(${i})" title="Quitar">✕</button></span>`;}
 function addCatInput(){const v=document.getElementById('cat-new').value.trim();if(!v)return;if(CATS.includes(v))return toast('Esa categoría ya existe');CATS.push(v);document.getElementById('cat-chips').innerHTML=CATS.map((c,j)=>catChip(c,j)).join('');document.getElementById('cat-new').value='';}
 function removeCat(i){CATS.splice(i,1);document.getElementById('cat-chips').innerHTML=CATS.map((c,j)=>catChip(c,j)).join('');}
 function saveCats(){if(FB_OK)db.collection('config').doc('app').set({categorias:CATS},{merge:true}).then(()=>toast('Categorías guardadas')).catch(()=>toast('Error al guardar'));else toast('Categorías guardadas (demo)');}
-function saveContacto(){if(FB_OK)db.collection('config').doc('app').set({cupon:fv('cfg-cupon'),wa1:fv('cfg-wa1'),wa2:fv('cfg-wa2'),canal:fv('cfg-canal')},{merge:true});toast('Datos de contacto guardados');}
+function saveContacto(){
+  const d={precio:+fv('cfg-precio')||499,cupon:fv('cfg-cupon'),wa1:fv('cfg-wa1'),wa2:fv('cfg-wa2'),canal:fv('cfg-canal')};
+  Object.assign(_appCfg,d);
+  if(FB_OK)db.collection('config').doc('app').set(d,{merge:true}).then(()=>toast('Plan y contacto guardados',{type:'ok'})).catch(()=>toast('Error al guardar',{type:'err'}));
+  else toast('Plan y contacto guardados (demo)',{type:'ok'});
+}
 
 /* ====== MODAL FORM (reusable) ====== */
 let _saveFn=null;
@@ -374,7 +381,7 @@ function openForm(title,bodyHtml,saveFn){
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-head"><h3>${title}</h3><button class="modal-x" onclick="closeModal()">✕</button></div>
     <div class="modal-body">${bodyHtml}
-      <div class="modal-foot"><button class="btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn-save" onclick="_saveFn()">Guardar</button></div>
+      <div class="modal-foot"><button class="btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn-save" id="modal-save" onclick="_saveFn()">Guardar</button></div>
     </div>`;
   document.getElementById('modal').classList.add('open');
 }
@@ -391,22 +398,31 @@ function editItem(coll,id){
   openForm(cfg.title,cfg.form(item),()=>cfg.save(id));
 }
 function delItem(coll,id){
-  const map={foro:'foro'};const key=map[coll]||coll;
-  if(!confirm('¿Eliminar este registro? No se puede deshacer.'))return;
-  const collName=coll==='foro'?'foro_temas':coll;
-  if(FB_OK){db.collection(collName).doc(id).delete().then(()=>{toast('Eliminado');reload();}).catch(()=>toast('Error al eliminar'));}
-  else{DATA[key]=DATA[key].filter(x=>x.id!==id);toast('Eliminado');renderSection(currentSection);}
+  const dataKey=coll, collName=coll==='foro'?'foro_temas':coll;
+  const item=DATA[dataKey].find(x=>x.id===id); if(!item)return;
+  const snap=JSON.parse(JSON.stringify(item));
+  const restore=()=>{
+    if(FB_OK){const{id:iid,...rest}=snap;db.collection(collName).doc(iid).set(rest).then(()=>{DATA[dataKey].unshift(snap);renderSection(currentSection);toast('Restaurado',{type:'ok'});});}
+    else{DATA[dataKey].unshift(snap);renderSection(currentSection);toast('Restaurado',{type:'ok'});}
+  };
+  if(FB_OK){
+    db.collection(collName).doc(id).delete().then(()=>{DATA[dataKey]=DATA[dataKey].filter(x=>x.id!==id);renderSection(currentSection);toast('Registro eliminado',{type:'ok',undo:restore});}).catch(()=>toast('Error al eliminar',{type:'err'}));
+  }else{
+    DATA[dataKey]=DATA[dataKey].filter(x=>x.id!==id);renderSection(currentSection);toast('Registro eliminado',{type:'ok',undo:restore});
+  }
 }
 
 /* ====== SAVE genérico ====== */
 function saveDoc(coll,id,data){
+  const btn=document.getElementById('modal-save');
+  if(btn){btn.disabled=true;btn._txt=btn.textContent;btn.textContent='Guardando…';}
+  const ok=()=>{toast(id?'Cambios guardados':'Creado correctamente',{type:'ok'});closeModal();if(FB_OK)reload();else renderSection(currentSection);};
+  const fail=()=>{if(btn){btn.disabled=false;btn.textContent=btn._txt||'Guardar';}toast('Error al guardar',{type:'err'});};
   if(FB_OK){
     const ref=id?db.collection(coll).doc(id):db.collection(coll).doc();
-    ref.set(data,{merge:true}).then(()=>{toast(id?'Actualizado':'Creado');closeModal();reload();}).catch(()=>toast('Error al guardar'));
+    ref.set(data,{merge:true}).then(ok).catch(fail);
   }else{
-    if(id){const it=DATA[coll].find(x=>x.id===id);Object.assign(it,data);}
-    else DATA[coll].unshift({id:'demo'+Date.now(),...data});
-    toast(id?'Actualizado':'Creado');closeModal();renderSection(currentSection);
+    setTimeout(()=>{if(id){const it=DATA[coll].find(x=>x.id===id);Object.assign(it,data);}else DATA[coll].unshift({id:'demo'+Date.now(),...data});ok();},450);
   }
 }
 
@@ -440,7 +456,7 @@ async function loadData(){
     const foro=await db.collection('foro_temas').get();if(!foro.empty)DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
     const miem=await db.collection('miembros').get();if(!miem.empty)DATA.miembros=miem.docs.map(d=>{const x=d.data();return {id:d.id,...x,alta:x.creado?.toDate?x.creado.toDate().toLocaleDateString('es-MX'):'—'};});
     const notif=await db.collection('notificaciones').orderBy('fecha','desc').get();if(!notif.empty)DATA.notificaciones=notif.docs.map(d=>({id:d.id,...d.data()}));
-    const cfg=await db.collection('config').doc('app').get();if(cfg.exists&&Array.isArray(cfg.data().categorias)&&cfg.data().categorias.length)CATS=cfg.data().categorias;
+    const cfg=await db.collection('config').doc('app').get();if(cfg.exists){_appCfg=cfg.data();if(Array.isArray(_appCfg.categorias)&&_appCfg.categorias.length)CATS=_appCfg.categorias;}
   }catch(e){console.warn('Firestore:',e.message);}
 }
 
@@ -452,7 +468,14 @@ function refreshUserUI(){document.getElementById('u-name').textContent=CURRENT_U
 function toggleSidebar(open){const sb=document.getElementById('sidebar'),bd=document.getElementById('sb-backdrop');if(open===undefined)open=!sb.classList.contains('open');sb.classList.toggle('open',open);bd.classList.toggle('open',open);}
 function toggleTheme(){const cur=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=cur;try{localStorage.setItem('imdac-admin-theme',cur);}catch(e){}updateThemeIcon();}
 function updateThemeIcon(){const btn=document.getElementById('theme-btn');if(!btn)return;const dark=document.documentElement.dataset.theme==='dark';btn.innerHTML=dark?'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>':'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>';btn.title=dark?'Modo claro':'Modo oscuro';}
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
+function toast(m,opts={}){
+  const t=document.getElementById('toast');
+  const type=opts.type||'ok';const icon=type==='err'?'✕':type==='info'?'i':'✓';
+  t.innerHTML=`<span class="tic ${type}">${icon}</span><span>${m}</span>${opts.undo?'<button class="undo" id="toast-undo">Deshacer</button>':''}`;
+  t.classList.add('show');
+  if(opts.undo){document.getElementById('toast-undo').onclick=()=>{opts.undo();t.classList.remove('show');};}
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),opts.undo?5500:2600);
+}
 
 /* ====== ARRANQUE ====== */
 async function onLogged(){
