@@ -68,14 +68,25 @@ function renderSection(sec){
 
 /* ====== DASHBOARD ====== */
 function renderDashboard(){
-  const ingreso=DATA.miembros.length*499;
+  const precio=+(_appCfg.precio)||499;
+  const activos=DATA.miembros.filter(m=>(m.estado||'Activo')!=='Cancelado').length;
+  const cancelados=DATA.miembros.filter(m=>(m.estado||'Activo')==='Cancelado').length;
+  const base=activos+cancelados;
+  const mrr=activos*precio, arr=mrr*12, churn=base?(cancelados/base*100):0;
+  const money=n=>'$'+Math.round(n).toLocaleString('es-MX');
   return `
   <div class="page-head"><div><h1 class="page-h">Dashboard</h1><p class="page-sub">Resumen general del Club IMDAC.</p></div></div>
   <div class="stats">
-    ${statCard('Miembros',DATA.miembros.length,'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z')}
+    ${statCard('Miembros activos',activos,'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z')}
+    ${statCard('MRR',money(mrr),'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z')}
+    ${statCard('ARR',money(arr),'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6')}
+    ${statCard('Churn',churn.toFixed(1)+'%','M13 17h8m0 0V9m0 8l-8-8-4 4-6-6')}
+  </div>
+  <div class="stats" style="margin-top:4px">
     ${statCard('Cursos',DATA.cursos.length,'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253')}
     ${statCard('Webinars',DATA.webinars.length,'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z')}
-    ${statCard('MRR estimado','$'+ingreso.toLocaleString('es-MX'),'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z')}
+    ${statCard('Material',DATA.material.length,'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z')}
+    ${statCard('Precio mensual',money(precio),'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z')}
   </div>
   <div class="card">
     <table class="tbl"><thead><tr><th>Últimos miembros</th><th>Correo</th><th>Alta</th></tr></thead>
@@ -147,7 +158,7 @@ function noticiaRow(n){return `<tr><td><div class="t-cell"><div class="t-thumb" 
 function materialRow(m){return `<tr><td class="t-title">📄 ${m.titulo}</td><td>${m.desc||'—'}</td><td>${actions('material',m.id)}</td></tr>`;}
 function miembroRow(m){return `<tr>
   <td><div class="t-cell"><div class="t-thumb" style="border-radius:9px;background:var(--rojo);color:#fff;display:grid;place-items:center;font-weight:700;font-family:var(--font-display)">${(m.nombre||'U')[0].toUpperCase()}</div><span class="t-title">${m.nombre||'—'}</span></div></td>
-  <td>${m.email||'—'}</td><td>${m.ciudad||'—'}</td><td><span class="tag green">Activo</span></td>
+  <td>${m.email||'—'}</td><td>${m.ciudad||'—'}</td><td>${(m.estado||'Activo')==='Cancelado'?'<span class="tag gray">Cancelado</span>':(m.estado==='Suspendido'?'<span class="tag">Suspendido</span>':'<span class="tag green">Activo</span>')}</td>
   <td><div class="row-actions"><button class="ico-btn" onclick="verMiembro('${m.id}')" title="Ver"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
   <button class="ico-btn del" onclick="delItem('miembros','${m.id}')" title="Eliminar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></td></tr>`;}
 function foroRow(t){return `<tr><td class="t-title">${t.titulo}</td><td>${t.autor||'—'}</td><td><span class="tag">${t.tag||'General'}</span></td>
@@ -294,20 +305,96 @@ function saveMaterial(id){const d={titulo:fv('f-titulo'),desc:fv('f-desc'),url:f
 function renderMiembros(){return listSection('miembros',{title:'Miembros',sub:'Consulta y administra los miembros del club.',head:['Miembro','Correo','Ciudad','Estado'],search:'Buscar por nombre, correo o ciudad...'});}
 function verMiembro(id){
   const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
+  const estado=(m.estado||'Activo');
+  const estTag=estado==='Cancelado'?'<span class="tag gray">Cancelado</span>':estado==='Suspendido'?'<span class="tag">Suspendido</span>':'<span class="tag green">Activo</span>';
+  const nAsign=(m.cursosAsignados||[]).length;
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-head"><h3>Detalle del miembro</h3><button class="modal-x" onclick="closeModal()">✕</button></div>
     <div class="modal-body">
-      <div class="member-hero"><div class="av">${(m.nombre||'U')[0].toUpperCase()}</div><div><h3 style="font-family:var(--font-display);font-size:1.3rem">${m.nombre||'—'}</h3><span style="color:var(--muted)">${m.email||''}</span></div></div>
+      <div class="member-hero"><div class="av">${(m.nombre||'U')[0].toUpperCase()}</div><div><h3 style="font-family:var(--font-display);font-size:1.3rem">${m.nombre||'—'}</h3><span style="color:var(--muted)">${m.email||''}</span></div><div style="margin-left:auto">${estTag}</div></div>
       <div class="member-info">
         <div class="it"><div class="l">Teléfono</div><div class="v">${m.telefono||'—'}</div></div>
         <div class="it"><div class="l">Ciudad</div><div class="v">${m.ciudad||'—'}</div></div>
         <div class="it"><div class="l">Profesión</div><div class="v">${m.profesion||'—'}</div></div>
         <div class="it"><div class="l">Alta</div><div class="v">${m.alta||'—'}</div></div>
+        <div class="it"><div class="l">Vigencia hasta</div><div class="v">${m.vigenciaHasta||'—'}${m.diasRegalados?` <span class="tag gray">+${m.diasRegalados}d</span>`:''}</div></div>
+        <div class="it"><div class="l">Cursos asignados</div><div class="v">${nAsign}</div></div>
         <div class="it" style="grid-column:1/-1"><div class="l">Biografía</div><div class="v" style="font-weight:400">${m.bio||'—'}</div></div>
       </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px">
+        <button class="btn-ghost" onclick="verProgreso('${id}')">📊 Ver progreso</button>
+        <button class="btn-ghost" onclick="regalarTiempo('${id}')">🎁 Regalar tiempo</button>
+        <button class="btn-ghost" onclick="asignarCurso('${id}')">📚 Asignar curso</button>
+        <button class="btn-ghost" onclick="toggleMiembroEstado('${id}')">${estado==='Cancelado'?'✅ Reactivar':'⛔ Cancelar'}</button>
+      </div>
+      <div id="mbr-panel"></div>
       <div class="modal-foot"><button class="btn-ghost" onclick="closeModal()">Cerrar</button></div>
     </div>`;
   document.getElementById('modal').classList.add('open');
+}
+const _MBRFORM='background:var(--base);border:1.5px solid var(--line);border-radius:12px;padding:14px;margin-top:8px';
+const _MBRINP='flex:1;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface,var(--base));color:var(--text)';
+function _saveMiembro(m,msg){
+  if(FB_OK){const {id,alta,...rest}=m;db.collection('miembros').doc(id).set(rest,{merge:true}).then(()=>toast(msg,{type:'ok'})).catch(()=>toast('Error al guardar',{type:'err'}));}
+  else toast(msg+' (demo)',{type:'ok'});
+}
+function regalarTiempo(id){
+  const p=document.getElementById('mbr-panel');if(!p)return;
+  p.innerHTML=`<div style="${_MBRFORM}">
+    <label style="font-size:.82rem;color:var(--muted)">Días a regalar / extender vigencia</label>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <input id="rt-dias" type="number" min="1" value="30" style="${_MBRINP}">
+      <button class="btn-save" onclick="confirmRegalarTiempo('${id}')">Aplicar</button>
+    </div></div>`;
+}
+function confirmRegalarTiempo(id){
+  const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
+  const dias=+document.getElementById('rt-dias').value||0;
+  if(dias<=0)return toast('Indica un número de días válido',{type:'err'});
+  let base=m.vigenciaHasta?new Date(m.vigenciaHasta):new Date();
+  if(isNaN(base.getTime()))base=new Date();
+  base.setDate(base.getDate()+dias);
+  m.vigenciaHasta=base.toISOString().slice(0,10);
+  m.diasRegalados=(m.diasRegalados||0)+dias;
+  _saveMiembro(m,`Se regalaron ${dias} días a ${m.nombre||'el miembro'}`);
+  verMiembro(id);
+}
+function asignarCurso(id){
+  const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
+  const asign=m.cursosAsignados||[];
+  const opts=DATA.cursos.map(c=>`<option value="${c.id}" ${asign.includes(c.id)?'disabled':''}>${esc(c.titulo)}${asign.includes(c.id)?' (ya asignado)':''}</option>`).join('');
+  const p=document.getElementById('mbr-panel');if(!p)return;
+  p.innerHTML=`<div style="${_MBRFORM}">
+    <label style="font-size:.82rem;color:var(--muted)">Asignar curso (acceso inmediato, ignora el goteo)</label>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <select id="ac-curso" style="${_MBRINP}">${opts||'<option value="">Sin cursos disponibles</option>'}</select>
+      <button class="btn-save" onclick="confirmAsignarCurso('${id}')">Asignar</button>
+    </div></div>`;
+}
+function confirmAsignarCurso(id){
+  const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
+  const cid=document.getElementById('ac-curso').value;if(!cid)return;
+  m.cursosAsignados=Array.from(new Set([...(m.cursosAsignados||[]),cid]));
+  const c=DATA.cursos.find(x=>x.id===cid);
+  _saveMiembro(m,`Curso "${c?c.titulo:cid}" asignado`);
+  verMiembro(id);
+}
+function verProgreso(id){
+  const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
+  const prog=m.progreso||{}, asign=m.cursosAsignados||[];
+  const ids=Array.from(new Set([...Object.keys(prog),...asign]));
+  const p=document.getElementById('mbr-panel');if(!p)return;
+  if(!ids.length){p.innerHTML=`<div style="${_MBRFORM}"><span style="color:var(--muted);font-size:.88rem">Sin datos de progreso ni cursos asignados.</span></div>`;return;}
+  p.innerHTML=`<div style="${_MBRFORM}">${ids.map(cid=>{
+    const c=DATA.cursos.find(x=>x.id===cid);const pct=Math.round(prog[cid]||0);
+    return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:4px"><span>${c?esc(c.titulo):cid}</span><b>${pct}%</b></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:var(--rojo)"></i></div></div>`;
+  }).join('')}</div>`;
+}
+function toggleMiembroEstado(id){
+  const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
+  m.estado=(m.estado||'Activo')==='Cancelado'?'Activo':'Cancelado';
+  _saveMiembro(m,m.estado==='Cancelado'?'Membresía cancelada':'Membresía reactivada');
+  verMiembro(id);if(typeof rebuildRows==='function')rebuildRows();
 }
 
 /* ====== FORO (moderación) ====== */
@@ -504,6 +591,10 @@ const DEMO={
   noticias:[{id:'n1',titulo:'Nuevas Normas Técnicas Complementarias entran en vigor',fuente:'CMIC',resumen:'Actualización de requisitos de diseño estructural.',fecha:'30/5/2026',img:'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=300&q=70',url:'#'}],
   material:[],
   foro:[{id:'f1',titulo:'¿Qué software usan para presupuestar?',autor:'Arq. Demo',tag:'Costos',likes:3,vistas:12}],
-  miembros:[{id:'m1',nombre:'Arq. Demo Usuario',email:'demo@imdac.mx',ciudad:'Tehuacán, Pue.',telefono:'238 000 0000',profesion:'Arquitecto',alta:'21/5/2026',bio:'Miembro de prueba.'}],
+  miembros:[
+    {id:'m1',nombre:'Arq. Demo Usuario',email:'demo@imdac.mx',ciudad:'Tehuacán, Pue.',telefono:'238 000 0000',profesion:'Arquitecto',alta:'21/5/2026',bio:'Miembro de prueba.',estado:'Activo',vigenciaHasta:'2026-12-31',cursosAsignados:['c1'],progreso:{c1:60}},
+    {id:'m2',nombre:'Ing. Laura Méndez',email:'laura@imdac.mx',ciudad:'Puebla, Pue.',telefono:'222 111 2222',profesion:'Ing. Civil',alta:'2/5/2026',bio:'',estado:'Activo'},
+    {id:'m3',nombre:'Arq. Carlos Ruiz',email:'carlos@imdac.mx',ciudad:'CDMX',telefono:'55 333 4444',profesion:'Arquitecto',alta:'10/4/2026',bio:'',estado:'Cancelado'},
+  ],
   notificaciones:[],
 };
