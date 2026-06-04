@@ -229,9 +229,9 @@ function addCategoria(){
 function claseEditRow(cl={},i){return `<div class="clase-edit" data-clase draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondragend="dragEnd(event)">
   <span class="grip" title="Arrastra para reordenar">⠿</span>
   <span class="num">${i+1}</span>
-  <input data-cl="titulo" value="${esc(cl.titulo)}" placeholder="Título de la clase">
-  <input data-cl="duracion" value="${esc(cl.duracion)||'2 Horas'}" placeholder="Duración" style="max-width:110px">
-  <input data-cl="videoUrl" value="${esc(cl.videoUrl)}" placeholder="URL Google Drive" style="max-width:170px">
+  <input class="in-titulo" data-cl="titulo" value="${esc(cl.titulo)}" placeholder="Título de la clase">
+  <input class="in-dur" data-cl="duracion" value="${esc(cl.duracion)||'2 Horas'}" placeholder="Duración">
+  <input class="in-url" data-cl="videoUrl" value="${esc(cl.videoUrl)}" placeholder="URL Google Drive">
   <button class="rm" onclick="this.parentElement.remove();renumClases()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
 </div>`;}
 let _dragEl=null;
