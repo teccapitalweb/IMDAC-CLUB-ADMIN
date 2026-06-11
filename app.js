@@ -17,8 +17,9 @@ const DEMO_ADMIN = { email:"admin@imdac.mx", pass:"IMDACAdmin2026" };
 
 let db=null, auth=null, FB_OK=false;
 try{
-  firebase.initializeApp(firebaseConfig);
-  auth=firebase.auth(); db=firebase.firestore();
+  // App con NOMBRE propio → sesión independiente de la del Club (mismo dominio, distinta llave)
+  const _adminApp=firebase.initializeApp(firebaseConfig,'imdac-admin');
+  auth=_adminApp.auth(); db=_adminApp.firestore();
   FB_OK = firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("REEMPLAZAR");
 }catch(e){ console.warn("Firebase sin configurar — modo demo.",e); }
 
