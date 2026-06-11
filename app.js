@@ -382,14 +382,23 @@ function confirmAsignarCurso(id){
 }
 function verProgreso(id){
   const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
-  const prog=m.progreso||{}, asign=m.cursosAsignados||[];
-  const ids=Array.from(new Set([...Object.keys(prog),...asign]));
   const p=document.getElementById('mbr-panel');if(!p)return;
-  if(!ids.length){p.innerHTML=`<div style="${_MBRFORM}"><span style="color:var(--muted);font-size:.88rem">Sin datos de progreso ni cursos asignados.</span></div>`;return;}
-  p.innerHTML=`<div style="${_MBRFORM}">${ids.map(cid=>{
-    const c=DATA.cursos.find(x=>x.id===cid);const pct=Math.round(prog[cid]||0);
-    return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:4px"><span>${c?esc(c.titulo):cid}</span><b>${pct}%</b></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:var(--rojo)"></i></div></div>`;
-  }).join('')}</div>`;
+  const asign=m.cursosAsignados||[];
+  const pintar=(prog)=>{
+    const ids=Array.from(new Set([...Object.keys(prog),...asign]));
+    if(!ids.length){p.innerHTML=`<div style="${_MBRFORM}"><span style="color:var(--muted);font-size:.88rem">Sin datos de progreso ni cursos asignados.</span></div>`;return;}
+    p.innerHTML=`<div style="${_MBRFORM}">${ids.map(cid=>{
+      const c=DATA.cursos.find(x=>x.id===cid);const pct=Math.round(prog[cid]||0);
+      return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:4px"><span>${c?esc(c.titulo):cid}</span><b>${pct}%</b></div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:var(--rojo)"></i></div></div>`;
+    }).join('')}</div>`;
+  };
+  if(FB_OK){
+    p.innerHTML=`<div style="${_MBRFORM}"><span style="color:var(--muted);font-size:.88rem">Cargando progreso…</span></div>`;
+    db.collection('progreso').where('uid','==',id).get().then(snap=>{
+      const prog={};snap.forEach(d=>{const x=d.data();prog[x.cursoId]=x.porcentaje||0;});
+      pintar(prog);
+    }).catch(()=>pintar(m.progreso||{}));
+  }else pintar(m.progreso||{});
 }
 function toggleMiembroEstado(id){
   const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
