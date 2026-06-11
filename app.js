@@ -428,7 +428,7 @@ function notifForm(n={}){_notifEmoji=n.emoji||'📢';return `
   <div class="field"><label>Segmento</label><select id="f-segmento"><option>Todos los miembros</option><option>Solo Premium</option><option>Nuevos (último mes)</option></select></div>`;}
 function pickEmoji(e){_notifEmoji=e;document.querySelectorAll('#emoji-pick button').forEach(b=>b.classList.toggle('active',b.textContent===e));}
 function newNotif(){openForm('Nueva notificación',notifForm(),()=>saveNotif(null));}
-function saveNotif(id){const d={emoji:_notifEmoji,titulo:fv('f-titulo'),mensaje:fv('f-mensaje'),segmento:fv('f-segmento'),fecha:new Date().toLocaleDateString('es-MX')};if(!d.titulo)return toast('El título es obligatorio');saveDoc('notificaciones',id,d);}
+function saveNotif(id){const d={emoji:_notifEmoji,titulo:fv('f-titulo'),mensaje:fv('f-mensaje'),segmento:fv('f-segmento'),fecha:new Date().toLocaleDateString('es-MX'),creado:firebase.firestore.FieldValue.serverTimestamp()};if(!d.titulo)return toast('El título es obligatorio');saveDoc('notificaciones',id,d);}
 
 /* ====== CONFIG ====== */
 function renderConfig(){
