@@ -24,7 +24,7 @@ try{
 }catch(e){ console.warn("Firebase sin configurar — modo demo.",e); }
 
 let CURRENT_USER=null;
-let DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[]};
+let DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],precios:[]};
 let CATS=["Estructuras","Instalaciones","Costos y Presupuestos","Topografía","Diseño CAD","Normatividad","Sustentabilidad","Gestión de Obra"];
 const NIVELES=["Básico","Intermedio","Avanzado"];
 const ESTADOS=["Publicado","Borrador"];
@@ -40,6 +40,7 @@ const NAV=[
   {id:"webinars",label:"Webinars",icon:'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z'},
   {id:"noticias",label:"Noticias",icon:'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9'},
   {id:"material",label:"Material PDF",icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'},
+  {id:"precios",label:"Precios Unitarios",icon:'M9 8h6m-5 0a3 3 0 110 6H9l3 3m-3-6h6m6 1a9 9 0 11-18 0 9 9 0 0118 0z'},
   {id:"miembros",label:"Miembros",icon:'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'},
   {id:"foro",label:"Foro",icon:'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z'},
   {id:"notificaciones",label:"Notificaciones",icon:'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'},
@@ -63,7 +64,7 @@ function go(sec){
 }
 function renderSection(sec){
   const R={dashboard:renderDashboard,cursos:renderCursos,webinars:renderWebinars,noticias:renderNoticias,
-    material:renderMaterial,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig};
+    material:renderMaterial,precios:renderPrecios,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig};
   document.getElementById('content').innerHTML=`<div class="section active">${(R[sec]||renderDashboard)()}</div>`;
 }
 
@@ -104,6 +105,7 @@ const ROWCFG={
   material:{key:'material',fields:m=>[m.titulo,m.desc],row:materialRow},
   miembros:{key:'miembros',fields:m=>[m.nombre,m.email,m.ciudad],row:miembroRow},
   foro:{key:'foro',fields:t=>[t.titulo,t.autor],row:foroRow},
+  precios:{key:'precios',fields:p=>[p.concepto,p.unidad],row:precioRow},
 };
 function getList(sec){
   const cfg=ROWCFG[sec]; let list=DATA[cfg.key]||[];
@@ -302,6 +304,17 @@ function materialForm(m={}){return `<div class="form-grid">
 function newMaterial(){openForm('Nuevo material',materialForm(),()=>saveMaterial(null));}
 function saveMaterial(id){const d={titulo:fv('f-titulo'),desc:fv('f-desc'),url:fv('f-url')};if(!d.titulo)return toast('El título es obligatorio');saveDoc('material',id,d);}
 
+/* ====== PRECIOS UNITARIOS ====== */
+function renderPrecios(){return listSection('precios',{title:'Precios Unitarios',sub:'Catálogo de conceptos de obra que ven los miembros en el Club.',addLabel:'Nuevo concepto',addFn:'newPrecio()',head:['Concepto','Unidad','P.U.'],search:'Buscar concepto...'});}
+function precioRow(p){return `<tr><td class="t-title">${p.concepto||''}</td><td><span class="tag">${p.unidad||'—'}</span></td><td style="font-weight:700">${p.precio||'—'}</td><td>${actions('precios',p.id)}</td></tr>`;}
+function precioForm(p={}){return `<div class="form-grid">
+  <div class="field form-full"><label>Concepto</label><input id="f-concepto" value="${esc(p.concepto)}" placeholder="Ej. Muro de block 15 cm asentado"></div>
+  <div class="field"><label>Unidad</label><input id="f-unidad" value="${esc(p.unidad)}" placeholder="m², m³, ml, pza, lote"></div>
+  <div class="field"><label>P.U. estimado</label><input id="f-precio" value="${esc(p.precio)}" placeholder="$540.00"></div>
+</div>`;}
+function newPrecio(){openForm('Nuevo concepto',precioForm(),()=>savePrecio(null));}
+function savePrecio(id){const d={concepto:fv('f-concepto'),unidad:fv('f-unidad'),precio:fv('f-precio')};if(!d.concepto)return toast('El concepto es obligatorio');saveDoc('precios',id,d);}
+
 /* ====== MIEMBROS ====== */
 function renderMiembros(){return listSection('miembros',{title:'Miembros',sub:'Consulta y administra los miembros del club.',head:['Miembro','Correo','Ciudad','Estado'],search:'Buscar por nombre, correo o ciudad...'});}
 function verMiembro(id){
@@ -489,7 +502,8 @@ const COLL_MAP={cursos:{data:'cursos',form:cursoForm,save:saveCurso,title:'Edita
   webinars:{data:'webinars',form:webinarForm,save:saveWebinar,title:'Editar webinar'},
   noticias:{data:'noticias',form:noticiaForm,save:saveNoticia,title:'Editar noticia'},
   material:{data:'material',form:materialForm,save:saveMaterial,title:'Editar material'},
-  notificaciones:{data:'notificaciones',form:notifForm,save:saveNotif,title:'Editar notificación'}};
+  notificaciones:{data:'notificaciones',form:notifForm,save:saveNotif,title:'Editar notificación'},
+  precios:{data:'precios',form:precioForm,save:savePrecio,title:'Editar concepto'}};
 function editItem(coll,id){
   const cfg=COLL_MAP[coll];const item=DATA[cfg.data].find(x=>x.id===id);if(!item)return;
   openForm(cfg.title,cfg.form(item),()=>cfg.save(id));
@@ -544,7 +558,7 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 /* ====== DATA LOAD ====== */
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
-  DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones]};
+  DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],precios:[...DEMO.precios]};
   if(!FB_OK)return;
   try{
     const cols=['cursos','webinars','noticias','material'];
@@ -553,6 +567,7 @@ async function loadData(){
     const foro=await db.collection('foro_temas').get();if(!foro.empty)DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
     const miem=await db.collection('miembros').get();if(!miem.empty)DATA.miembros=miem.docs.map(d=>{const x=d.data();return {id:d.id,...x,alta:x.creado?.toDate?x.creado.toDate().toLocaleDateString('es-MX'):'—'};});
     const notif=await db.collection('notificaciones').orderBy('fecha','desc').get();if(!notif.empty)DATA.notificaciones=notif.docs.map(d=>({id:d.id,...d.data()}));
+    const pre=await db.collection('precios').get();DATA.precios=pre.docs.map(d=>({id:d.id,...d.data()}));
     const cfg=await db.collection('config').doc('app').get();if(cfg.exists){_appCfg=cfg.data();if(Array.isArray(_appCfg.categorias)&&_appCfg.categorias.length)CATS=_appCfg.categorias;}
   }catch(e){console.warn('Firestore:',e.message);}
 }
@@ -609,4 +624,5 @@ const DEMO={
     {id:'m3',nombre:'Arq. Carlos Ruiz',email:'carlos@imdac.mx',ciudad:'CDMX',telefono:'55 333 4444',profesion:'Arquitecto',alta:'10/4/2026',bio:'',estado:'Cancelado'},
   ],
   notificaciones:[],
+  precios:[],
 };
