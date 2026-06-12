@@ -558,15 +558,16 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 /* ====== DATA LOAD ====== */
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
-  DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],precios:[...DEMO.precios]};
-  if(!FB_OK)return;
+  // Modo real: arranca vacío y solo se llena con Firestore. El demo aplica únicamente sin Firebase.
+  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],precios:[]};
+  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],precios:[...DEMO.precios]};return;}
   try{
     const cols=['cursos','webinars','noticias','material'];
     const snaps=await Promise.all(cols.map(c=>db.collection(c).get()));
-    cols.forEach((c,i)=>{if(!snaps[i].empty)DATA[c]=snaps[i].docs.map(d=>({id:d.id,...d.data()}));});
-    const foro=await db.collection('foro_temas').get();if(!foro.empty)DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
-    const miem=await db.collection('miembros').get();if(!miem.empty)DATA.miembros=miem.docs.map(d=>{const x=d.data();return {id:d.id,...x,alta:x.creado?.toDate?x.creado.toDate().toLocaleDateString('es-MX'):'—'};});
-    const notif=await db.collection('notificaciones').orderBy('fecha','desc').get();if(!notif.empty)DATA.notificaciones=notif.docs.map(d=>({id:d.id,...d.data()}));
+    cols.forEach((c,i)=>{DATA[c]=snaps[i].docs.map(d=>({id:d.id,...d.data()}));});
+    const foro=await db.collection('foro_temas').get();DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
+    const miem=await db.collection('miembros').get();DATA.miembros=miem.docs.map(d=>{const x=d.data();return {id:d.id,...x,alta:x.creado?.toDate?x.creado.toDate().toLocaleDateString('es-MX'):'—'};});
+    const notif=await db.collection('notificaciones').orderBy('fecha','desc').get();DATA.notificaciones=notif.docs.map(d=>({id:d.id,...d.data()}));
     const pre=await db.collection('precios').get();DATA.precios=pre.docs.map(d=>({id:d.id,...d.data()}));
     const cfg=await db.collection('config').doc('app').get();if(cfg.exists){_appCfg=cfg.data();if(Array.isArray(_appCfg.categorias)&&_appCfg.categorias.length)CATS=_appCfg.categorias;}
   }catch(e){console.warn('Firestore:',e.message);}
