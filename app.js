@@ -296,13 +296,19 @@ function saveNoticia(id){const d={titulo:fv('f-titulo'),fuente:fv('f-fuente'),fe
 
 /* ====== MATERIAL ====== */
 function renderMaterial(){return listSection('material',{title:'Material PDF',sub:'Sube guías, planos tipo y documentos descargables.',addLabel:'Nuevo material',addFn:'newMaterial()',head:['Título','Descripción'],search:'Buscar material...'});}
-function materialForm(m={}){return `<div class="form-grid">
+function materialForm(m={}){
+  const opts=(DATA.cursos||[]).map(c=>`<option value="${c.id}" ${m.cursoId===c.id?'selected':''}>${esc(c.titulo)}</option>`).join('');
+  return `<div class="form-grid">
   <div class="field form-full"><label>Título</label><input id="f-titulo" value="${esc(m.titulo)}"></div>
   <div class="field form-full"><label>Descripción</label><textarea id="f-desc" rows="2">${esc(m.desc)}</textarea></div>
   <div class="field form-full"><label>URL del PDF</label><input id="f-url" value="${esc(m.url)}" placeholder="https://..."></div>
+  <div class="field form-full"><label>Desbloquear junto con el curso (opcional)</label>
+    <select id="f-curso"><option value="">Disponible desde el inicio (sin goteo)</option>${opts}</select>
+    <small style="color:var(--muted);font-size:.78rem">Si eliges un curso, el socio verá este PDF bloqueado hasta que ese curso se le abra por goteo.</small>
+  </div>
 </div>`;}
 function newMaterial(){openForm('Nuevo material',materialForm(),()=>saveMaterial(null));}
-function saveMaterial(id){const d={titulo:fv('f-titulo'),desc:fv('f-desc'),url:fv('f-url')};if(!d.titulo)return toast('El título es obligatorio');saveDoc('material',id,d);}
+function saveMaterial(id){const d={titulo:fv('f-titulo'),desc:fv('f-desc'),url:fv('f-url'),cursoId:fv('f-curso')||''};if(!d.titulo)return toast('El título es obligatorio');saveDoc('material',id,d);}
 
 /* ====== PRECIOS UNITARIOS ====== */
 function renderPrecios(){return listSection('precios',{title:'Precios Unitarios',sub:'Catálogo de conceptos de obra que ven los miembros en el Club.',addLabel:'Nuevo concepto',addFn:'newPrecio()',head:['Concepto','Unidad','P.U.'],search:'Buscar concepto...'});}
