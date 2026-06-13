@@ -348,6 +348,15 @@ function verMiembro(id){
 }
 const _MBRFORM='background:var(--base);border:1.5px solid var(--line);border-radius:12px;padding:14px;margin-top:8px';
 const _MBRINP='flex:1;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface,var(--base));color:var(--text)';
+function notificarMiembro(uid,emoji,titulo,mensaje){
+  if(!FB_OK||!uid)return;
+  db.collection('notificaciones').add({
+    emoji,titulo,mensaje,
+    paraUid:uid,
+    fecha:new Date().toLocaleDateString('es-MX'),
+    creado:firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(()=>{});
+}
 function _saveMiembro(m,msg){
   if(FB_OK){const {id,alta,...rest}=m;db.collection('miembros').doc(id).set(rest,{merge:true}).then(()=>toast(msg,{type:'ok'})).catch(()=>toast('Error al guardar',{type:'err'}));}
   else toast(msg+' (demo)',{type:'ok'});
@@ -371,6 +380,7 @@ function confirmRegalarTiempo(id){
   m.vigenciaHasta=base.toISOString().slice(0,10);
   m.diasRegalados=(m.diasRegalados||0)+dias;
   _saveMiembro(m,`Se regalaron ${dias} días a ${m.nombre||'el miembro'}`);
+  notificarMiembro(id,'🎁','¡Te regalamos acceso!',`IMDAC te otorgó ${dias} días de acceso de cortesía. Tu membresía está activa hasta el ${m.vigenciaHasta}. ¡Disfruta el contenido!`);
   verMiembro(id);
 }
 function asignarCurso(id){
@@ -391,6 +401,7 @@ function confirmAsignarCurso(id){
   m.cursosAsignados=Array.from(new Set([...(m.cursosAsignados||[]),cid]));
   const c=DATA.cursos.find(x=>x.id===cid);
   _saveMiembro(m,`Curso "${c?c.titulo:cid}" asignado`);
+  notificarMiembro(id,'📚','Nuevo curso desbloqueado',`Se te dio acceso al curso "${c?c.titulo:'nuevo curso'}". Ya puedes verlo en tu biblioteca, sin esperar al goteo. ¡A aprender!`);
   verMiembro(id);
 }
 function verProgreso(id){
@@ -417,6 +428,8 @@ function toggleMiembroEstado(id){
   const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
   m.estado=(m.estado||'Activo')==='Cancelado'?'Activo':'Cancelado';
   _saveMiembro(m,m.estado==='Cancelado'?'Membresía cancelada':'Membresía reactivada');
+  if(m.estado==='Cancelado')notificarMiembro(id,'⛔','Membresía cancelada','Tu membresía fue cancelada por el equipo IMDAC. Si crees que es un error, escríbenos por WhatsApp.');
+  else notificarMiembro(id,'✅','Membresía reactivada','¡Buenas noticias! Tu membresía fue reactivada por el equipo IMDAC. Ya tienes acceso completo de nuevo.');
   verMiembro(id);if(typeof rebuildRows==='function')rebuildRows();
 }
 
