@@ -275,11 +275,12 @@ function webinarForm(w={}){return `<div class="form-grid">
   <div class="field form-full"><label>Título</label><input id="f-titulo" value="${esc(w.titulo)}"></div>
   <div class="field"><label>Fecha (texto visible)</label><input id="f-fecha" value="${esc(w.fecha)}" placeholder="15 jun 2026, 18:00"></div>
   <div class="field"><label>Fecha y hora (para countdown)</label><input id="f-fechaISO" type="datetime-local" value="${esc(w.fechaISO)}"></div>
+  <div class="field form-full"><label>URL en vivo (Meet / Zoom)</label><input id="f-envivo" value="${esc(w.envivo)}" placeholder="https://meet.google.com/... o https://zoom.us/..."></div>
   <div class="field form-full"><label>URL grabación (opcional)</label><input id="f-grabacion" value="${esc(w.grabacion)}" placeholder="https://drive.google.com/..."></div>
   <div class="field form-full"><label>Imagen (URL)</label><input id="f-img" value="${esc(w.img)}"></div>
 </div>`;}
 function newWebinar(){openForm('Nuevo webinar',webinarForm(),()=>saveWebinar(null));}
-function saveWebinar(id){const d={titulo:fv('f-titulo'),fecha:fv('f-fecha'),fechaISO:fv('f-fechaISO'),grabacion:fv('f-grabacion'),img:fv('f-img')};if(!d.titulo)return toast('El título es obligatorio');saveDoc('webinars',id,d);}
+function saveWebinar(id){const d={titulo:fv('f-titulo'),fecha:fv('f-fecha'),fechaISO:fv('f-fechaISO'),envivo:fv('f-envivo'),grabacion:fv('f-grabacion'),img:fv('f-img')};if(!d.titulo)return toast('El título es obligatorio');saveDoc('webinars',id,d);}
 
 /* ====== NOTICIAS ====== */
 function renderNoticias(){return listSection('noticias',{title:'Noticias',sub:'Publica novedades del sector de la construcción.',addLabel:'Nueva noticia',addFn:'newNoticia()',head:['Noticia','Fuente','Fecha'],search:'Buscar noticia...'});}
