@@ -218,7 +218,7 @@ function renderCursos(){
 }
 function cursoForm(c={}){
   const clases=c.listaClases||[];
-  return `
+  return `<div class="course-form">
   <div class="form-grid">
     <div class="field form-full"><label>Nombre del curso</label><input id="f-titulo" value="${esc(c.titulo)}" placeholder="Ej. Diseño Estructural de Concreto"></div>
     <div class="field form-full"><label>Descripción</label><textarea id="f-desc" rows="3">${esc(c.desc)}</textarea></div>
@@ -230,23 +230,34 @@ function cursoForm(c={}){
       <p style="color:var(--muted);font-size:.82rem;margin-top:6px">Si el valor es 0, el curso se desbloquea desde que el socio se registra. Si es 13, se desbloquea 13 días después.</p></div>
     <div class="field form-full"><label>📄 Temario del curso (Google Drive)</label><input id="f-temario" value="${esc(c.temario)}" placeholder="https://drive.google.com/file/d/..."></div>
     <div class="field form-full"><label>🖼️ Imagen de portada (Google Drive)</label><input id="f-img" value="${esc(c.img)}" placeholder="https://drive.google.com/file/d/..."></div>
+    <div class="field form-full"><label>🎬 Colección de Bunny Stream (opcional)</label><input id="f-bunny-collection" value="${esc(c.bunnyCollectionId)}" placeholder="ID de la colección en Bunny">
+      <p style="color:var(--muted);font-size:.82rem;margin-top:6px">Los videos se reproducen únicamente desde Bunny. Las URLs antiguas de Drive se conservan abajo solo para facilitar la migración.</p></div>
   </div>
   <div class="form-full" style="margin-top:8px">
     <label style="display:block;font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px">Clases del curso</label>
     <div id="clases-list">${clases.map((cl,i)=>claseEditRow(cl,i)).join('')}</div>
     <button class="btn-add-clase" onclick="addClaseRow()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 4v16m8-8H4"/></svg>Agregar clase</button>
-  </div>`;
+  </div></div>`;
 }
 function addCategoria(){
   const n=prompt('Nombre de la nueva categoría:');
   if(n&&n.trim()){const v=n.trim();if(CATS.includes(v)){toast('Ya existe');return;}CATS.push(v);const sel=document.getElementById('f-categoria');const o=document.createElement('option');o.textContent=v;o.selected=true;sel.appendChild(o);if(FB_OK)db.collection('config').doc('app').set({categorias:CATS},{merge:true});toast('Categoría agregada');}
 }
-function claseEditRow(cl={},i){return `<div class="clase-edit" data-clase draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondragend="dragEnd(event)">
+function nuevaClaseId(){return 'lesson-'+(globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2,10)}`);}
+function claseEditRow(cl={},i){
+  const lessonId=cl.lessonId||cl.id||nuevaClaseId();
+  const provider=cl.provider||(cl.videoId?'bunny':'drive');
+  const isPreview=cl.isPreview===true||(cl.isPreview!==false&&i===0);
+  return `<div class="clase-edit" data-clase draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondragend="dragEnd(event)">
   <span class="grip" title="Arrastra para reordenar">⠿</span>
   <span class="num">${i+1}</span>
   <input class="in-titulo" data-cl="titulo" value="${esc(cl.titulo)}" placeholder="Título de la clase">
   <input class="in-dur" data-cl="duracion" value="${esc(cl.duracion)||'2 Horas'}" placeholder="Duración">
-  <input class="in-url" data-cl="videoUrl" value="${esc(cl.videoUrl)}" placeholder="URL Google Drive">
+  <input class="in-id" data-cl="lessonId" value="${esc(lessonId)}" placeholder="ID estable" title="ID estable de la lección">
+  <select class="in-provider" data-cl="provider" title="Proveedor de video"><option value="bunny" ${provider==='bunny'?'selected':''}>Bunny</option><option value="drive" ${provider==='drive'?'selected':''}>Drive (legacy)</option></select>
+  <input class="in-video-id" data-cl="videoId" value="${esc(cl.videoId)}" placeholder="ID del video en Bunny" title="GUID del video en Bunny Stream">
+  <input class="in-url" data-cl="videoUrl" value="${esc(cl.videoUrl)}" placeholder="Drive legacy (migración)" title="Referencia antigua; no se reproduce al alumno">
+  <label class="in-preview" title="Permitir esta clase a usuarios registrados sin membresía"><input type="checkbox" data-cl="isPreview" ${isPreview?'checked':''}> Gratis</label>
   <button class="rm" onclick="this.parentElement.remove();renumClases()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
 </div>`;}
 let _dragEl=null;
@@ -260,11 +271,20 @@ function dragOver(e){
 }
 function addClaseRow(){const l=document.getElementById('clases-list');l.insertAdjacentHTML('beforeend',claseEditRow({},l.children.length));}
 function renumClases(){document.querySelectorAll('#clases-list .clase-edit').forEach((r,i)=>r.querySelector('.num').textContent=i+1);}
-function collectClases(){return [...document.querySelectorAll('#clases-list .clase-edit')].map(r=>({titulo:r.querySelector('[data-cl="titulo"]').value,duracion:r.querySelector('[data-cl="duracion"]').value,videoUrl:r.querySelector('[data-cl="videoUrl"]').value}));}
+function collectClases(){return [...document.querySelectorAll('#clases-list .clase-edit')].map((r,i)=>({
+  lessonId:r.querySelector('[data-cl="lessonId"]').value.trim()||nuevaClaseId(),
+  titulo:r.querySelector('[data-cl="titulo"]').value.trim(),
+  duracion:r.querySelector('[data-cl="duracion"]').value.trim(),
+  provider:r.querySelector('[data-cl="provider"]').value,
+  videoId:r.querySelector('[data-cl="videoId"]').value.trim(),
+  videoUrl:r.querySelector('[data-cl="videoUrl"]').value.trim(),
+  isPreview:r.querySelector('[data-cl="isPreview"]').checked,
+  orden:i+1
+}));}
 function newCurso(){openForm('Nuevo curso',cursoForm(),()=>saveCurso(null));}
 function saveCurso(id){
   const clases=collectClases();
-  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),instructor:fv('f-instructor'),estado:fv('f-estado'),dripDias:+fv('f-drip')||0,temario:fv('f-temario'),img:fv('f-img'),desc:fv('f-desc'),listaClases:clases,clases:clases.length};
+  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),instructor:fv('f-instructor'),estado:fv('f-estado'),dripDias:+fv('f-drip')||0,temario:fv('f-temario'),img:fv('f-img'),desc:fv('f-desc'),bunnyCollectionId:fv('f-bunny-collection').trim(),listaClases:clases,clases:clases.length};
   if(!data.titulo)return toast('El título es obligatorio');
   saveDoc('cursos',id,data);
 }
