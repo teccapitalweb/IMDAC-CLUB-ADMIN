@@ -146,7 +146,7 @@ function cursoRow(c){const est=(c.estado||'Publicado')==='Borrador';return `<tr>
   <td>${c.nivel||'—'}</td>
   <td>${(c.listaClases?c.listaClases.length:c.clases)||0}</td>
   <td>${est?'<span class="tag gray">Borrador</span>':'<span class="tag green">Publicado</span>'}</td>
-  <td>${c.dripDias?`<span class="tag gray">En ${c.dripDias} días</span>`:'<span class="tag green">Abierto</span>'}</td>
+  <td>${Number(c.order||0)?`<span class="tag">${Number(c.order)}</span>`:'<span class="tag gray">sin orden</span>'}</td>
   <td><div class="row-actions">
     <button class="ico-btn" onclick="previewCurso('${c.id}')" title="Vista previa"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
     <button class="ico-btn" onclick="duplicarCurso('${c.id}')" title="Duplicar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
@@ -214,7 +214,7 @@ function renderCursos(){
     ${searchBar('cursos','Buscar curso por título, categoría o instructor...')}
     <div class="chips-row">${catChips}</div>
     <div class="chips-row" style="margin-bottom:18px">${estChips}</div>
-    <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>${['Curso','Categoría','Nivel','Clases','Estado','Goteo'].map(h=>`<th>${h}</th>`).join('')}<th></th></tr></thead>
+    <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr>${['Curso','Categoría','Nivel','Clases','Estado','Orden'].map(h=>`<th>${h}</th>`).join('')}<th></th></tr></thead>
     <tbody id="tbl-body">${rowsHTML('cursos')}</tbody></table></div><div id="tbl-pager">${pagerInner('cursos')}</div></div>`;
 }
 function cursoForm(c={}){
@@ -230,8 +230,8 @@ function cursoForm(c={}){
     <div class="field form-full"><label>🎁 Curso de entrada</label>
       <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer"><input type="checkbox" id="f-entrada" ${cursoEsEntrada(c)?'checked':''}> Regalar la primera clase de este curso</label>
       <p style="color:var(--muted);font-size:.82rem;margin-top:6px">${avisoCursoEntrada(c)}</p></div>
-    <div class="field form-full"><label>Liberación por goteo (días desde registro del socio)</label><input id="f-drip" type="number" value="${c.dripDias||0}" placeholder="0">
-      <p style="color:var(--muted);font-size:.82rem;margin-top:6px">Si el valor es 0, el curso se desbloquea desde que el socio se registra. Si es 13, se desbloquea 13 días después.</p></div>
+    <div class="field form-full"><label>🔢 Orden en el catálogo</label><input id="f-order" type="number" value="${Number(c.order||0)}" placeholder="0">
+      <p style="color:var(--muted);font-size:.82rem;margin-top:6px">De menor a mayor: el 10 sale primero. Van de 10 en 10 para poder colar un curso entre dos sin renumerar el resto. Todos los socios ven el mismo orden.</p></div>
     <div class="field form-full"><label>📄 Temario del curso (Google Drive)</label><input id="f-temario" value="${esc(c.temario)}" placeholder="https://drive.google.com/file/d/..."></div>
     <div class="field form-full"><label>🖼️ Imagen de portada (Google Drive)</label><input id="f-img" value="${esc(c.img)}" placeholder="https://drive.google.com/file/d/..."></div>
     <div class="field form-full"><label>🎬 Colección de Bunny Stream (opcional)</label><input id="f-bunny-collection" value="${esc(c.bunnyCollectionId)}" placeholder="ID de la colección en Bunny">
@@ -319,7 +319,7 @@ function collectClases(){return [...document.querySelectorAll('#clases-list .cla
 function newCurso(){openForm('Nuevo curso',cursoForm(),()=>saveCurso(null));}
 function saveCurso(id){
   const clases=collectClases();
-  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),instructor:fv('f-instructor'),estado:fv('f-estado'),esCursoDeEntrada:!!document.getElementById('f-entrada')?.checked,dripDias:+fv('f-drip')||0,temario:fv('f-temario'),img:fv('f-img'),desc:fv('f-desc'),bunnyCollectionId:fv('f-bunny-collection').trim(),listaClases:clases,clases:clases.length};
+  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),instructor:fv('f-instructor'),estado:fv('f-estado'),esCursoDeEntrada:!!document.getElementById('f-entrada')?.checked,order:+fv('f-order')||0,temario:fv('f-temario'),img:fv('f-img'),desc:fv('f-desc'),bunnyCollectionId:fv('f-bunny-collection').trim(),listaClases:clases,clases:clases.length};
   if(!data.titulo)return toast('El título es obligatorio');
   saveDoc('cursos',id,data);
 }
@@ -359,8 +359,8 @@ function materialForm(m={}){
   <div class="field form-full"><label>Descripción</label><textarea id="f-desc" rows="2">${esc(m.desc)}</textarea></div>
   <div class="field form-full"><label>URL del PDF</label><input id="f-url" value="${esc(m.url)}" placeholder="https://..."></div>
   <div class="field form-full"><label>Desbloquear junto con el curso (opcional)</label>
-    <select id="f-curso"><option value="">Disponible desde el inicio (sin goteo)</option>${opts}</select>
-    <small style="color:var(--muted);font-size:.78rem">Si eliges un curso, el socio verá este PDF bloqueado hasta que ese curso se le abra por goteo.</small>
+    <select id="f-curso"><option value="">Sin curso asociado</option>${opts}</select>
+    <small style="color:var(--muted);font-size:.78rem">Sirve para agrupar el material junto a su curso en la lista del socio. No restringe el acceso: el PDF se descarga igual.</small>
   </div>
 </div>`;}
 function newMaterial(){openForm('Nuevo material',materialForm(),()=>saveMaterial(null));}
@@ -451,7 +451,7 @@ function asignarCurso(id){
   const opts=DATA.cursos.map(c=>`<option value="${c.id}" ${asign.includes(c.id)?'disabled':''}>${esc(c.titulo)}${asign.includes(c.id)?' (ya asignado)':''}</option>`).join('');
   const p=document.getElementById('mbr-panel');if(!p)return;
   p.innerHTML=`<div style="${_MBRFORM}">
-    <label style="font-size:.82rem;color:var(--muted)">Asignar curso (acceso inmediato, ignora el goteo)</label>
+    <label style="font-size:.82rem;color:var(--muted)">Asignar curso a este socio</label>
     <div style="display:flex;gap:8px;margin-top:6px">
       <select id="ac-curso" style="${_MBRINP}">${opts||'<option value="">Sin cursos disponibles</option>'}</select>
       <button class="btn-save" onclick="confirmAsignarCurso('${id}')">Asignar</button>
@@ -463,7 +463,7 @@ function confirmAsignarCurso(id){
   m.cursosAsignados=Array.from(new Set([...(m.cursosAsignados||[]),cid]));
   const c=DATA.cursos.find(x=>x.id===cid);
   _saveMiembro(m,`Curso "${c?c.titulo:cid}" asignado`);
-  notificarMiembro(id,'📚','Nuevo curso desbloqueado',`Se te dio acceso al curso "${c?c.titulo:'nuevo curso'}". Ya puedes verlo en tu biblioteca, sin esperar al goteo. ¡A aprender!`);
+  notificarMiembro(id,'📚','Nuevo curso desbloqueado',`Se te dio acceso al curso "${c?c.titulo:'nuevo curso'}". Ya puedes verlo en tu biblioteca. ¡A aprender!`);
   verMiembro(id);
 }
 function verProgreso(id){
