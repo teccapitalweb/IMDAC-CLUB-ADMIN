@@ -141,7 +141,7 @@ function listSection(sec,o){
 
 /* ====== ROW FUNCTIONS ====== */
 function cursoRow(c){const est=(c.estado||'Publicado')==='Borrador';return `<tr>
-  <td><div class="t-cell"><div class="t-thumb" style="background-image:url('${c.img||''}')"></div><span class="t-title">${c.titulo}</span></div></td>
+  <td><div class="t-cell"><div class="t-thumb" style="background-image:url('${c.img||''}')"></div><span class="t-title">${c.titulo}${cursoEsEntrada(c)?' <span class="tag green" title="Su primera clase se ve sin membresía">🎁 Entrada</span>':''}</span></div></td>
   <td><span class="tag">${c.categoria||'—'}</span></td>
   <td>${c.nivel||'—'}</td>
   <td>${(c.listaClases?c.listaClases.length:c.clases)||0}</td>
@@ -210,6 +210,7 @@ function renderCursos(){
   const estChips=['Todos','Publicado','Borrador'].map(e=>`<button class="chip ${_filterEstado===e?'active':''}" onclick="setEstadoFilter('${e}')">${e}</button>`).join('');
   return `<div class="page-head"><div><h1 class="page-h">Cursos</h1><p class="page-sub">Gestiona el catálogo y las clases de cada curso.</p></div>
     <button class="btn-add" onclick="newCurso()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>Nuevo curso</button></div>
+    ${bannerCursoEntrada()}
     ${searchBar('cursos','Buscar curso por título, categoría o instructor...')}
     <div class="chips-row">${catChips}</div>
     <div class="chips-row" style="margin-bottom:18px">${estChips}</div>
@@ -226,6 +227,9 @@ function cursoForm(c={}){
     <div class="field"><label>Nivel</label><select id="f-nivel">${NIVELES.map(x=>`<option ${c.nivel===x?'selected':''}>${x}</option>`).join('')}</select></div>
     <div class="field"><label>Instructor</label><input id="f-instructor" value="${esc(c.instructor)}" placeholder="Ej. Arq. Nombre"></div>
     <div class="field"><label>Estado</label><select id="f-estado">${ESTADOS.map(x=>`<option ${c.estado===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="field form-full"><label>🎁 Curso de entrada</label>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer"><input type="checkbox" id="f-entrada" ${cursoEsEntrada(c)?'checked':''}> Regalar la primera clase de este curso</label>
+      <p style="color:var(--muted);font-size:.82rem;margin-top:6px">${avisoCursoEntrada(c)}</p></div>
     <div class="field form-full"><label>Liberación por goteo (días desde registro del socio)</label><input id="f-drip" type="number" value="${c.dripDias||0}" placeholder="0">
       <p style="color:var(--muted);font-size:.82rem;margin-top:6px">Si el valor es 0, el curso se desbloquea desde que el socio se registra. Si es 13, se desbloquea 13 días después.</p></div>
     <div class="field form-full"><label>📄 Temario del curso (Google Drive)</label><input id="f-temario" value="${esc(c.temario)}" placeholder="https://drive.google.com/file/d/..."></div>
@@ -242,6 +246,37 @@ function cursoForm(c={}){
 function addCategoria(){
   const n=prompt('Nombre de la nueva categoría:');
   if(n&&n.trim()){const v=n.trim();if(CATS.includes(v)){toast('Ya existe');return;}CATS.push(v);const sel=document.getElementById('f-categoria');const o=document.createElement('option');o.textContent=v;o.selected=true;sel.appendChild(o);if(FB_OK)db.collection('config').doc('app').set({categorias:CATS},{merge:true});toast('Categoría agregada');}
+}
+/* Curso de entrada: el unico cuya primera clase se regala. Mismo criterio que
+   access.js:courseIsEntry en el backend — acepta booleano y cadena, porque los
+   formularios guardan texto. Si nadie lo marca no se regala nada: es deliberado,
+   regalar por omision no se nota hasta que alguien mira la factura. */
+function cursoEsEntrada(c={}){
+  if(c.esCursoDeEntrada===true)return true;
+  return String(c.esCursoDeEntrada||'').trim().toLowerCase()==='true';
+}
+function cursosDeEntrada(){return (DATA.cursos||[]).filter(cursoEsEntrada);}
+function avisoCursoEntrada(c={}){
+  const marcados=cursosDeEntrada();
+  const otros=marcados.filter(x=>x.id!==c.id);
+  if(cursoEsEntrada(c)&&otros.length)
+    return `⚠️ Hay ${marcados.length} cursos de entrada a la vez: ${marcados.map(x=>esc(x.titulo)).join(', ')}. Valen todos, se regala la primera clase de cada uno. Si no era la intención, desmarca los que sobren.`;
+  if(!cursoEsEntrada(c)&&otros.length===1)
+    return `Hoy el curso de entrada es «${esc(otros[0].titulo)}». Si marcas este, habrá dos y se regalará la primera clase de los dos.`;
+  if(!cursoEsEntrada(c)&&otros.length>1)
+    return `⚠️ Ya hay ${otros.length} cursos de entrada: ${otros.map(x=>esc(x.titulo)).join(', ')}.`;
+  if(cursoEsEntrada(c))
+    return 'Este es el curso de entrada. Su primera clase se ve sin membresía.';
+  return '⚠️ Ningún curso está marcado como de entrada: hoy no se regala ninguna clase. Marca uno para tener gancho de captación.';
+}
+/* Aviso en el listado, no solo dentro del formulario: los dos estados que
+   importan (ninguno marcado, o varios) no se ven abriendo un curso cualquiera. */
+function bannerCursoEntrada(){
+  const m=cursosDeEntrada();
+  if(m.length===1)return '';
+  const caja=(color,fondo,txt)=>`<div class="card" style="border-left:4px solid ${color};background:${fondo};padding:12px 16px;margin-bottom:14px;font-size:.9rem">${txt}</div>`;
+  if(!m.length)return caja('#b86b00','#fff8ec','⚠️ <b>Ningún curso está marcado como de entrada.</b> Hoy no se regala ninguna clase: todo el catálogo exige membresía. Si quieres gancho de captación, edita un curso y marca «Curso de entrada».');
+  return caja('#b86b00','#fff8ec',`⚠️ <b>Hay ${m.length} cursos de entrada a la vez:</b> ${m.map(x=>esc(x.titulo)).join(', ')}. Se regala la primera clase de cada uno. Si no era la intención, desmarca los que sobren.`);
 }
 function nuevaClaseId(){return 'lesson-'+(globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2,10)}`);}
 function claseEditRow(cl={},i){
@@ -284,7 +319,7 @@ function collectClases(){return [...document.querySelectorAll('#clases-list .cla
 function newCurso(){openForm('Nuevo curso',cursoForm(),()=>saveCurso(null));}
 function saveCurso(id){
   const clases=collectClases();
-  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),instructor:fv('f-instructor'),estado:fv('f-estado'),dripDias:+fv('f-drip')||0,temario:fv('f-temario'),img:fv('f-img'),desc:fv('f-desc'),bunnyCollectionId:fv('f-bunny-collection').trim(),listaClases:clases,clases:clases.length};
+  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),instructor:fv('f-instructor'),estado:fv('f-estado'),esCursoDeEntrada:!!document.getElementById('f-entrada')?.checked,dripDias:+fv('f-drip')||0,temario:fv('f-temario'),img:fv('f-img'),desc:fv('f-desc'),bunnyCollectionId:fv('f-bunny-collection').trim(),listaClases:clases,clases:clases.length};
   if(!data.titulo)return toast('El título es obligatorio');
   saveDoc('cursos',id,data);
 }
