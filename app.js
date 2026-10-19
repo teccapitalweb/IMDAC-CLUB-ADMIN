@@ -547,16 +547,11 @@ function cursosListaHTML(){
   }
   return `<div class="curso-grid" id="curso-grid">${pageItems.length?pageItems.map(cursoCard).join(''):`<div class="card" style="grid-column:1/-1"><div class="empty"><b>${total?'Sin resultados':'Aún no hay cursos'}</b><span>${total?'Prueba con otra búsqueda o filtro.':'Crea el primero con el botón de arriba.'}</span></div></div>`}</div>`;
 }
-function setAvailMode(drip){
-  const w=document.getElementById('f-drip-wrap'); if(w)w.style.display=drip?'block':'none';
-  document.querySelectorAll('.avail-opt').forEach(el=>el.classList.toggle('sel',el.dataset.avail===(drip?'drip':'now')));
-}
 let _removedCourseMaterialIds=[];
 function cursoForm(c={}){
   _removedCourseMaterialIds=[];
   const clases=c.listaClases||[];
   const materiales=c.id?materialesDeCurso(c.id):[];
-  const dripOn=Number(c.dripDias||0)>0;
   const pruebaGratis=c.esPruebaGratuita===true||String(c.esPruebaGratuita||'').toLowerCase()==='true';
   return `<div class="course-form">
   <div class="form-grid">
@@ -569,20 +564,7 @@ function cursoForm(c={}){
     <div class="field"><label>Horas totales (opcional)</label><input id="f-horas" type="number" min="0" step="0.5" value="${Number(c.horasTotales)||''}" placeholder="Auto: suma de clases">
       <p style="color:var(--muted);font-size:.78rem;margin-top:6px">Vacío = se calcula solo sumando la duración de cada clase.</p></div>
     <div class="field form-full"><label>Disponibilidad para los miembros</label>
-      <div class="avail-opts">
-        <label class="avail-opt ${!dripOn?'sel':''}" data-avail="now">
-          <input type="radio" name="f-avail-mode" value="now" ${!dripOn?'checked':''} onchange="setAvailMode(false)">
-          <div><b>Disponible ahora</b><span>El curso se ve de inmediato para todos los socios, sin esperar.</span></div>
-        </label>
-        <label class="avail-opt ${dripOn?'sel':''}" data-avail="drip">
-          <input type="radio" name="f-avail-mode" value="drip" ${dripOn?'checked':''} onchange="setAvailMode(true)">
-          <div><b>Desbloqueo progresivo</b><span>El curso aparece según la antigüedad del socio en el Club.</span></div>
-        </label>
-      </div>
-      <div class="field" id="f-drip-wrap" style="margin-top:10px;${dripOn?'':'display:none'}">
-        <label>Días de espera desde el alta del socio</label>
-        <input id="f-drip-dias" type="number" min="1" value="${Number(c.dripDias)||7}" placeholder="7">
-      </div>
+      <div class="avail-opt sel"><div><b>Ruta de membresía automática</b><span>El primer curso se habilita al activar la membresía y se libera uno adicional cada 7 días, según el orden del catálogo.</span></div></div>
     </div>
     <div class="field form-full"><label>Prueba gratuita</label>
       <label class="avail-opt ${pruebaGratis?'sel':''}" style="display:flex;align-items:flex-start;gap:10px">
@@ -777,8 +759,7 @@ function saveCurso(id){
     const err=validarActividad(clases[i].actividad,i+1);
     if(err)return toast(err,{type:'err'});
   }
-  const dripOn=document.querySelector('input[name="f-avail-mode"]:checked')?.value==='drip';
-  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),instructor:fv('f-instructor'),estado:fv('f-estado'),esPruebaGratuita:!!document.getElementById('f-prueba-gratuita')?.checked,dripDias:dripOn?(+fv('f-drip-dias')||7):0,horasTotales:+fv('f-horas')||0,temario:fv('f-temario'),img:fv('f-img'),desc:fv('f-desc'),listaClases:clases,clases:clases.length};
+  const data={titulo:fv('f-titulo'),categoria:fv('f-categoria'),nivel:fv('f-nivel'),instructor:fv('f-instructor'),estado:fv('f-estado'),esPruebaGratuita:!!document.getElementById('f-prueba-gratuita')?.checked,horasTotales:+fv('f-horas')||0,temario:fv('f-temario'),img:fv('f-img'),desc:fv('f-desc'),listaClases:clases,clases:clases.length};
   if(!data.titulo)return toast('El título es obligatorio');
   if(materiales.some(m=>!m.titulo||!m.url))return toast('Cada material necesita título y URL',{type:'err'});
   if(materiales.some(m=>!m.disponibleSiempre&&!m.claseId))return toast('Elige la clase que desbloquea cada material o marca “Disponible siempre”',{type:'err'});
