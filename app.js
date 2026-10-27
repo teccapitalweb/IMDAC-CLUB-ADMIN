@@ -1096,7 +1096,8 @@ async function migrarPortadasMaterial(btn){
     const data=await apiFetch('/admin/migrar-portadas-material',{method:'POST'});
     if(data.fallidos&&data.fallidos.length){
       console.warn('Portadas que no se pudieron migrar:',data.fallidos);
-      toast(`${data.migrados} migradas, ${data.fallidos.length} fallaron (revisa la consola) — ${data.saltados} ya estaban listas`,{type:'err'});
+      const primerError=data.fallidos[0].error||'error desconocido';
+      toast(`${data.migrados} migradas, ${data.fallidos.length} fallaron: "${primerError}"`,{type:'err'});
     }else{
       toast(`${data.migrados} portada${data.migrados===1?'':'s'} migrada${data.migrados===1?'':'s'} a Storage · ${data.saltados} ya estaban listas`);
     }
