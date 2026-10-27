@@ -125,6 +125,7 @@ const NAV=[
   {id:"material",label:"PDFs y material",group:"Contenido",icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'},
   {id:"certificados",label:"Certificados",group:"Contenido",icon:'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'},
   {id:"preguntas",label:"Quiz del Arquitecto",group:"Contenido",icon:'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'},
+  {id:"retosvisuales",label:"Detecta el error",group:"Contenido",icon:'M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z'},
   {id:"notificaciones",label:"Notificaciones",group:"Comunicación",icon:'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'},
   {id:"miembros",label:"Miembros VIP",group:"Comunidad",icon:'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'},
   {id:"pagos",label:"Pagos",group:"Comunidad",icon:'M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'},
@@ -196,7 +197,7 @@ function go(sec){
 function renderSection(sec){
   const R={dashboard:renderDashboard,cursos:renderCursos,webinars:renderWebinars,noticias:renderNoticias,
     material:renderMaterial,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig,verpanel:renderVerPanel,
-    certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,
+    certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,retosvisuales:renderRetosVisuales,
     metricas:()=>renderSinDatos('metricas'),pruebas:()=>renderSinDatos('pruebas'),pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:()=>renderSinDatos('encuesta')};
   document.getElementById('content').innerHTML=`<div class="section active">${(R[sec]||renderDashboard)()}</div>`;
 }
@@ -1202,6 +1203,11 @@ function renderPreguntas(){
     <div id="preg-list" style="margin-top:18px">${preguntasListaHTML()}</div>`;
 }
 
+function retoVisualForm(r={}){return `<div class="form-grid"><div class="field form-full"><label>Título</label><input id="f-titulo" value="${esc(r.titulo)}"></div><div class="field"><label>Categoría</label><input id="f-categoria" value="${esc(r.categoria||'Seguridad')}"></div><div class="field"><label>Dificultad</label><select id="f-dificultad">${QUIZ_DIFICULTADES.map(([v,l])=>`<option value="${v}" ${r.dificultad===v?'selected':''}>${l}</option>`).join('')}</select></div><div class="field form-full"><label>URL de la fotografía</label><input id="f-imagen" value="${esc(r.imagen)}" placeholder="https://…"></div><div class="field form-full"><label>Fuente verificable (URL)</label><input id="f-fuente" value="${esc(r.fuente)}"></div><div class="field form-full"><label>Crédito / licencia</label><input id="f-credito" value="${esc(r.credito)}"></div><div class="field form-full"><label>Instrucción</label><textarea id="f-descripcion" rows="2">${esc(r.descripcion)}</textarea></div><div class="field form-full"><label>Pista</label><input id="f-pista" value="${esc(r.pista)}"></div><div class="field form-full"><label>Zonas correctas (JSON, coordenadas 0–100)</label><textarea id="f-zonas" rows="8" placeholder='[{"id":"zona-1","x":10,"y":20,"w":15,"h":12,"titulo":"Aspecto a revisar","feedback":"Explicación técnica prudente."}]'>${esc(JSON.stringify(r.zonas||[],null,2))}</textarea><small>Publica solo fotos reales con fuente y crédito. Usa “aspecto a revisar” si la imagen no permite confirmar un incumplimiento.</small></div><div class="field form-full"><label><input type="checkbox" id="f-activo" ${r.activo===false?'':'checked'}> Activo</label></div></div>`;}
+function newRetoVisual(){openForm('Nuevo reto visual',retoVisualForm(),()=>saveRetoVisual(null));}
+function saveRetoVisual(id){let zonas=[];try{zonas=JSON.parse(fv('f-zonas')||'[]');}catch(e){return toast('Las zonas deben estar en JSON válido');}const d={titulo:fv('f-titulo').trim(),categoria:fv('f-categoria').trim(),dificultad:fv('f-dificultad')||'facil',imagen:fv('f-imagen').trim(),fuente:fv('f-fuente').trim(),credito:fv('f-credito').trim(),descripcion:fv('f-descripcion').trim(),pista:fv('f-pista').trim(),zonas,activo:document.getElementById('f-activo')?.checked!==false};if(!d.titulo||!d.imagen||!d.fuente||!d.credito)return toast('Título, foto, fuente y crédito son obligatorios');if(!Array.isArray(zonas)||!zonas.length)return toast('Agrega al menos una zona');saveDoc('retos_visuales',id,d);}
+function renderRetosVisuales(){const list=DATA.retos_visuales||[];return `<div class="page-head"><div><div class="pill-eyebrow">Zona de Juegos</div><h1 class="page-h">Detecta el error</h1><p class="page-sub">Carga la foto, su fuente verificable y zonas en porcentajes para el juego.</p></div><button class="btn-add" onclick="newRetoVisual()">+ Nuevo reto</button></div>${list.length?`<div class="mat-rows">${list.map(r=>`<div class="mat-row" onclick="editItem('retos_visuales','${r.id}')"><div class="mat-row__thumb" style="background-image:url('${esc(driveImg(r.imagen))}')"></div><div class="mat-row__body"><div class="mat-row__title">${esc(r.titulo)}</div><div class="mat-row__meta"><span>${esc(r.categoria)} · ${(r.zonas||[]).length} zonas</span></div></div><span class="tag ${r.activo===false?'gray':''}">${r.activo===false?'Inactivo':'Activo'}</span></div>`).join('')}</div>`:`<div class="card"><div class="empty"><b>Aún no hay retos</b><span>Agrega una fotografía real y define las zonas revisables.</span></div></div>`}`;}
+
 /* ====== DIRECTORIO VIP (admin: moderar las tarjetas que arman los socios) ====== */
 function renderDirectorioAdmin(){
   return `<div class="page-head"><div>
@@ -2076,7 +2082,7 @@ const COLL_MAP={cursos:{data:'cursos',form:cursoForm,save:saveCurso,title:'Edita
   material:{data:'material',form:materialForm,save:saveMaterial,title:'Editar material'},
   certificados:{data:'certificados',form:certificadoForm,save:saveCertificado,title:'Editar certificado'},
   datos_curiosos:{data:'datos_curiosos',form:datoCuriosoForm,save:saveDatoCurioso,title:'Editar dato'},
-  preguntas:{data:'preguntas',form:preguntaForm,save:savePregunta,title:'Editar pregunta'}};
+  preguntas:{data:'preguntas',form:preguntaForm,save:savePregunta,title:'Editar pregunta'},retos_visuales:{data:'retos_visuales',form:retoVisualForm,save:saveRetoVisual,title:'Editar reto visual'}};
 function editItem(coll,id){
   const cfg=COLL_MAP[coll];const item=DATA[cfg.data].find(x=>x.id===id);if(!item)return;
   const title=coll==='cursos'?`Editar curso<span style="display:block;font-size:.8rem;font-weight:500;color:var(--muted);margin-top:3px">${esc(item.titulo||'')}</span>`:cfg.title;
@@ -2141,14 +2147,14 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
   // Modo real: arranca vacío y solo se llena con Firestore. El demo aplica únicamente sin Firebase.
-  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[]};
+  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[]};
   if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[]};return;}
   // Cada colección se trae por separado y con su propio catch: una colección
   // sin reglas desplegadas todavía (ej. certificados, antes de pegar las
   // reglas nuevas en Firebase Console) no debe tumbar el resto del panel.
   const safeGet=(c)=>db.collection(c).get().catch(e=>{console.warn(`Firestore (${c}):`,e.message);return {docs:[]};});
   try{
-    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas'];
+    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas','retos_visuales'];
     const snaps=await Promise.all(cols.map(safeGet));
     cols.forEach((c,i)=>{DATA[c]=snaps[i].docs.map(d=>({id:d.id,...d.data()}));});
     const foro=await safeGet('foro_temas');DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
