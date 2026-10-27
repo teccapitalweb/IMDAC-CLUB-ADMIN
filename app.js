@@ -124,6 +124,7 @@ const NAV=[
   {id:"webinars",label:"Clases en vivo",group:"Contenido",icon:'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z'},
   {id:"material",label:"PDFs y material",group:"Contenido",icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'},
   {id:"certificados",label:"Certificados",group:"Contenido",icon:'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'},
+  {id:"preguntas",label:"Quiz del Arquitecto",group:"Contenido",icon:'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'},
   {id:"notificaciones",label:"Notificaciones",group:"Comunicación",icon:'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'},
   {id:"miembros",label:"Miembros VIP",group:"Comunidad",icon:'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'},
   {id:"pagos",label:"Pagos",group:"Comunidad",icon:'M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'},
@@ -195,7 +196,7 @@ function go(sec){
 function renderSection(sec){
   const R={dashboard:renderDashboard,cursos:renderCursos,webinars:renderWebinars,noticias:renderNoticias,
     material:renderMaterial,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig,verpanel:renderVerPanel,
-    certificados:renderCertificados,directorio:renderDirectorioAdmin,
+    certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,
     metricas:()=>renderSinDatos('metricas'),pruebas:()=>renderSinDatos('pruebas'),pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:()=>renderSinDatos('encuesta')};
   document.getElementById('content').innerHTML=`<div class="section active">${(R[sec]||renderDashboard)()}</div>`;
 }
@@ -1115,6 +1116,92 @@ function saveMaterial(id){
   saveDoc('material',id,d);
 }
 
+/* ====== Quiz del Arquitecto (Zona de Juegos, Fase 1) ======
+   El socio nunca lee esta colección directo (firestore.rules la deja solo
+   para isAdmin()) -- ve las preguntas filtradas vía /preguntas-quiz y se
+   califican en /quiz-responder, ambos en el webhook. Categorías fijas por
+   ahora: las mismas ocho que se definieron para el Quiz. */
+const QUIZ_CATEGORIAS=['Arquitectura','Materiales','Estructuras','Procesos constructivos','Instalaciones','Seguridad','Interpretación de planos','Ingeniería civil'];
+const QUIZ_DIFICULTADES=[['facil','Fácil'],['intermedio','Intermedio'],['dificil','Difícil']];
+function preguntaForm(p={}){
+  const opciones=Array.isArray(p.opciones)&&p.opciones.length===4?p.opciones:['','','',''];
+  const correctaIndex=Number.isInteger(p.correctaIndex)?p.correctaIndex:0;
+  return `<div class="form-grid">
+  <div class="field"><label>Categoría</label><select id="f-categoria">${QUIZ_CATEGORIAS.map(c=>`<option ${p.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+  <div class="field"><label>Dificultad</label><select id="f-dificultad">${QUIZ_DIFICULTADES.map(([v,l])=>`<option value="${v}" ${p.dificultad===v?'selected':''}>${l}</option>`).join('')}</select></div>
+  <div class="field form-full"><label>Pregunta</label><textarea id="f-pregunta" rows="2">${esc(p.pregunta)}</textarea></div>
+  ${opciones.map((o,i)=>`<div class="field form-full"><label>Opción ${i+1}${i===correctaIndex?' ✓ correcta':''}</label>
+    <div style="display:flex;gap:10px;align-items:center">
+      <input id="f-opcion-${i}" value="${esc(o)}" style="flex:1">
+      <label style="display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:.84rem;color:var(--muted)"><input type="radio" name="f-correcta" value="${i}" ${i===correctaIndex?'checked':''}> Correcta</label>
+    </div></div>`).join('')}
+  <div class="field form-full"><label>Explicación (se muestra al responder, siempre)</label><textarea id="f-explicacion" rows="2">${esc(p.explicacion)}</textarea></div>
+  <div class="field form-full"><label style="display:flex;align-items:center;gap:8px;font-weight:600"><input type="checkbox" id="f-activo" ${p.activo===false?'':'checked'}> Activa (aparece en el quiz de los socios)</label></div>
+</div>`;}
+function newPregunta(){openForm('Nueva pregunta',preguntaForm(),()=>savePregunta(null));}
+function savePregunta(id){
+  const opciones=[0,1,2,3].map(i=>fv('f-opcion-'+i).trim());
+  const correctaEl=document.querySelector('input[name="f-correcta"]:checked');
+  const d={
+    categoria:fv('f-categoria'), dificultad:fv('f-dificultad')||'facil',
+    pregunta:fv('f-pregunta').trim(), opciones,
+    correctaIndex:correctaEl?Number(correctaEl.value):0,
+    explicacion:fv('f-explicacion').trim(),
+    activo:document.getElementById('f-activo')?.checked!==false
+  };
+  if(!d.pregunta)return toast('La pregunta es obligatoria');
+  if(opciones.some(o=>!o))return toast('Completa las 4 opciones');
+  if(!d.explicacion)return toast('La explicación es obligatoria');
+  saveDoc('preguntas',id,d);
+}
+function preguntasStats(){
+  const activas=DATA.preguntas.filter(p=>p.activo!==false).length;
+  const porCategoria=new Set(DATA.preguntas.map(p=>p.categoria).filter(Boolean)).size;
+  return {activas,porCategoria};
+}
+function preguntaRowCard(p){
+  const dificultadLabel=(QUIZ_DIFICULTADES.find(([v])=>v===p.dificultad)||[,'Fácil'])[1];
+  return `<div class="mat-row" onclick="editItem('preguntas','${p.id}')">
+    <div class="mat-row__thumb" style="background:var(--rojo-50);color:var(--rojo);display:grid;place-items:center;font-weight:800;font-size:.82rem">${esc(dificultadLabel)}</div>
+    <div class="mat-row__body">
+      <div class="mat-row__title">${esc((p.pregunta||'').length>90?p.pregunta.slice(0,90)+'…':p.pregunta)}</div>
+      <div class="mat-row__meta"><span class="mat-row__curso">${esc(p.categoria||'Sin categoría')}</span></div>
+    </div>
+    <span class="tag ${p.activo===false?'gray':''}">${p.activo===false?'Inactiva':'Activa'}</span>
+    <div class="row-actions" onclick="event.stopPropagation()">
+      <button class="ico-btn" onclick="editItem('preguntas','${p.id}')" title="Editar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+      <button class="ico-btn del" onclick="delItem('preguntas','${p.id}')" title="Eliminar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+    </div>
+  </div>`;
+}
+let _pregSearch='';
+function onPregSearch(v){_pregSearch=v;const c=document.getElementById('preg-list');if(c)c.innerHTML=preguntasListaHTML();}
+function preguntasFiltradas(){
+  const q=_pregSearch.toLowerCase().trim();
+  if(!q)return DATA.preguntas.slice();
+  return DATA.preguntas.filter(p=>(p.pregunta||'').toLowerCase().includes(q)||(p.categoria||'').toLowerCase().includes(q));
+}
+function preguntasListaHTML(){
+  const list=preguntasFiltradas();
+  if(!list.length)return `<div class="card"><div class="empty"><b>Sin resultados</b><span>Prueba con otra búsqueda, o crea la primera pregunta.</span></div></div>`;
+  return `<div class="mat-rows">${list.map(preguntaRowCard).join('')}</div>`;
+}
+function renderPreguntas(){
+  const st=preguntasStats();
+  return `<div class="page-head"><div>
+    <div class="pill-eyebrow">Zona de Juegos</div>
+    <h1 class="page-h">Quiz del Arquitecto</h1><p class="page-sub">Banco de preguntas del quiz. Jugar es libre para cualquier socio; ganar monedas requiere membresía activa.</p></div>
+    <button class="btn-add" onclick="newPregunta()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>Nueva pregunta</button>
+    </div>
+    <div class="stats" style="margin-bottom:20px">
+      ${statCard('Total preguntas',DATA.preguntas.length,'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z')}
+      ${statCard('Activas en el quiz',st.activas,'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z')}
+      ${statCard('Categorías en uso',st.porCategoria,'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10')}
+    </div>
+    <div class="search-admin" style="max-width:460px"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg><input value="${esc(_pregSearch)}" oninput="onPregSearch(this.value)" placeholder="Buscar por pregunta o categoría..."></div>
+    <div id="preg-list" style="margin-top:18px">${preguntasListaHTML()}</div>`;
+}
+
 /* ====== DIRECTORIO VIP (admin: moderar las tarjetas que arman los socios) ====== */
 function renderDirectorioAdmin(){
   return `<div class="page-head"><div>
@@ -1988,7 +2075,8 @@ const COLL_MAP={cursos:{data:'cursos',form:cursoForm,save:saveCurso,title:'Edita
   noticias:{data:'noticias',form:noticiaForm,save:saveNoticia,title:'Editar noticia'},
   material:{data:'material',form:materialForm,save:saveMaterial,title:'Editar material'},
   certificados:{data:'certificados',form:certificadoForm,save:saveCertificado,title:'Editar certificado'},
-  datos_curiosos:{data:'datos_curiosos',form:datoCuriosoForm,save:saveDatoCurioso,title:'Editar dato'}};
+  datos_curiosos:{data:'datos_curiosos',form:datoCuriosoForm,save:saveDatoCurioso,title:'Editar dato'},
+  preguntas:{data:'preguntas',form:preguntaForm,save:savePregunta,title:'Editar pregunta'}};
 function editItem(coll,id){
   const cfg=COLL_MAP[coll];const item=DATA[cfg.data].find(x=>x.id===id);if(!item)return;
   const title=coll==='cursos'?`Editar curso<span style="display:block;font-size:.8rem;font-weight:500;color:var(--muted);margin-top:3px">${esc(item.titulo||'')}</span>`:cfg.title;
@@ -2053,14 +2141,14 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
   // Modo real: arranca vacío y solo se llena con Firestore. El demo aplica únicamente sin Firebase.
-  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[]};
-  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[]};return;}
+  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[]};
+  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[]};return;}
   // Cada colección se trae por separado y con su propio catch: una colección
   // sin reglas desplegadas todavía (ej. certificados, antes de pegar las
   // reglas nuevas en Firebase Console) no debe tumbar el resto del panel.
   const safeGet=(c)=>db.collection(c).get().catch(e=>{console.warn(`Firestore (${c}):`,e.message);return {docs:[]};});
   try{
-    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos'];
+    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas'];
     const snaps=await Promise.all(cols.map(safeGet));
     cols.forEach((c,i)=>{DATA[c]=snaps[i].docs.map(d=>({id:d.id,...d.data()}));});
     const foro=await safeGet('foro_temas');DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
