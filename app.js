@@ -989,7 +989,10 @@ function renderMaterial(){
   return `<div class="page-head"><div>
     <div class="pill-eyebrow">Biblioteca descargable</div>
     <h1 class="page-h">PDFs y material</h1><p class="page-sub">Todos los materiales están vinculados a un curso. Aquí ves la lista completa, sin importar a cuál pertenecen.</p></div>
-    <button class="btn-add" onclick="newMaterial()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>Nuevo material</button></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn-ghost" onclick="migrarPortadasMaterial(this)" title="Copia las portadas que aun esten en Google Drive a Firebase Storage, para que dejen de fallar al cargar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Migrar portadas a Storage</button>
+      <button class="btn-add" onclick="newMaterial()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>Nuevo material</button>
+    </div>
     <div class="stats" style="margin-bottom:20px">
       ${statCard('Total materiales',DATA.material.length,'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z')}
       ${statCard('Cursos con material',st.cursosConMat,'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253')}
@@ -1086,6 +1089,25 @@ function materialForm(m={}){
   </div>
 </div>`;}
 function newMaterial(){openForm('Nuevo material',materialForm(),()=>saveMaterial(null));}
+async function migrarPortadasMaterial(btn){
+  if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  toast('Migrando portadas de Drive a Storage, puede tardar un poco…',{type:'info'});
+  try{
+    const data=await apiFetch('/admin/migrar-portadas-material',{method:'POST'});
+    if(data.fallidos&&data.fallidos.length){
+      console.warn('Portadas que no se pudieron migrar:',data.fallidos);
+      toast(`${data.migrados} migradas, ${data.fallidos.length} fallaron (revisa la consola) — ${data.saltados} ya estaban listas`,{type:'err'});
+    }else{
+      toast(`${data.migrados} portada${data.migrados===1?'':'s'} migrada${data.migrados===1?'':'s'} a Storage · ${data.saltados} ya estaban listas`);
+    }
+    await loadData();
+    if(currentSection==='material')renderSection('material');
+  }catch(e){
+    toast(e.message||'No se pudo migrar las portadas',{type:'err'});
+  }finally{
+    if(btn){btn.disabled=false;btn.style.opacity='';}
+  }
+}
 function saveMaterial(id){
   const d={titulo:fv('f-titulo'),desc:fv('f-desc'),url:fv('f-url'),img:fv('f-img').trim(),formato:fv('f-formato')||'PDF',cursoId:fv('f-curso')||'',claseId:fv('f-clase')||''};
   if(!d.titulo)return toast('El título es obligatorio');
