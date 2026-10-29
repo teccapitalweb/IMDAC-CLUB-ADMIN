@@ -5,12 +5,12 @@
 
 /* ====== CONFIG — usar la MISMA cuenta Firebase que el Club ====== */
 const firebaseConfig = {
-  apiKey: "AIzaSyA2b3n294FxG3GmPNEUX_Odc1NZVw2G77U",
-  authDomain: "imdac-club.firebaseapp.com",
-  projectId: "imdac-club",
-  storageBucket: "imdac-club.firebasestorage.app",
-  messagingSenderId: "619551799543",
-  appId: "1:619551799543:web:594105a2e0e6dd11047bf2"
+  apiKey: "AIzaSyCps1AMDXyh9iAPDLVdzk4gNRyHRwtUedw",
+  authDomain: "imdac-club-prod.firebaseapp.com",
+  projectId: "imdac-club-prod",
+  storageBucket: "imdac-club-prod.firebasestorage.app",
+  messagingSenderId: "302004970658",
+  appId: "1:302004970658:web:d390d5199220f2cb86e3fb"
 };
 // Credenciales demo (cuando Firebase no está configurado aún)
 const DEMO_ADMIN = { email:"admin@imdac.mx", pass:"IMDACAdmin2026" };
