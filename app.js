@@ -126,6 +126,7 @@ const NAV=[
   {id:"certificados",label:"Certificados",group:"Contenido",icon:'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'},
   {id:"preguntas",label:"Quiz del Arquitecto",group:"Contenido",icon:'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'},
   {id:"retosvisuales",label:"Detecta el error",group:"Contenido",icon:'M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z'},
+  {id:"tienda",label:"Tienda de recompensas",group:"Contenido",icon:'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'},
   {id:"notificaciones",label:"Notificaciones",group:"Comunicación",icon:'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'},
   {id:"miembros",label:"Miembros VIP",group:"Comunidad",icon:'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'},
   {id:"pagos",label:"Pagos",group:"Comunidad",icon:'M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'},
@@ -197,7 +198,7 @@ function go(sec){
 function renderSection(sec){
   const R={dashboard:renderDashboard,cursos:renderCursos,webinars:renderWebinars,noticias:renderNoticias,
     material:renderMaterial,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig,verpanel:renderVerPanel,
-    certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,retosvisuales:renderRetosVisuales,
+    certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,retosvisuales:renderRetosVisuales,tienda:renderTienda,
     metricas:()=>renderSinDatos('metricas'),pruebas:()=>renderSinDatos('pruebas'),pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:()=>renderSinDatos('encuesta')};
   document.getElementById('content').innerHTML=`<div class="section active">${(R[sec]||renderDashboard)()}</div>`;
 }
@@ -1208,6 +1209,72 @@ function newRetoVisual(){openForm('Nuevo reto visual',retoVisualForm(),()=>saveR
 function saveRetoVisual(id){let zonas=[];try{zonas=JSON.parse(fv('f-zonas')||'[]');}catch(e){return toast('Las zonas deben estar en JSON válido');}const d={titulo:fv('f-titulo').trim(),categoria:fv('f-categoria').trim(),dificultad:fv('f-dificultad')||'facil',imagen:fv('f-imagen').trim(),fuente:fv('f-fuente').trim(),credito:fv('f-credito').trim(),descripcion:fv('f-descripcion').trim(),pista:fv('f-pista').trim(),zonas,activo:document.getElementById('f-activo')?.checked!==false};if(!d.titulo||!d.imagen||!d.fuente||!d.credito)return toast('Título, foto, fuente y crédito son obligatorios');if(!Array.isArray(zonas)||!zonas.length)return toast('Agrega al menos una zona');saveDoc('retos_visuales',id,d);}
 function renderRetosVisuales(){const list=DATA.retos_visuales||[];return `<div class="page-head"><div><div class="pill-eyebrow">Zona de Juegos</div><h1 class="page-h">Detecta el error</h1><p class="page-sub">Carga la foto, su fuente verificable y zonas en porcentajes para el juego.</p></div><button class="btn-add" onclick="newRetoVisual()">+ Nuevo reto</button></div>${list.length?`<div class="mat-rows">${list.map(r=>`<div class="mat-row" onclick="editItem('retos_visuales','${r.id}')"><div class="mat-row__thumb" style="background-image:url('${esc(driveImg(r.imagen))}')"></div><div class="mat-row__body"><div class="mat-row__title">${esc(r.titulo)}</div><div class="mat-row__meta"><span>${esc(r.categoria)} · ${(r.zonas||[]).length} zonas</span></div></div><span class="tag ${r.activo===false?'gray':''}">${r.activo===false?'Inactivo':'Activo'}</span></div>`).join('')}</div>`:`<div class="card"><div class="empty"><b>Aún no hay retos</b><span>Agrega una fotografía real y define las zonas revisables.</span></div></div>`}`;}
 
+/* ====== TIENDA DE RECOMPENSAS ======
+   Dos tipos de artículo: 'archivo' (plantilla/PDF descargable, vive en
+   Drive -- la URL real nunca se le muestra a un socio que no haya pagado,
+   eso lo hace /tienda-canjear en el webhook) y 'curso_anticipado' (canje de
+   un solo uso por cuenta para adelantar el curso que tengan bloqueado por
+   el goteo de 7 días; no se liga a un curso fijo, el socio elige cuál al
+   canjear). */
+const TIENDA_TIPOS=[['archivo','Archivo descargable'],['curso_anticipado','Desbloqueo anticipado de curso']];
+function tiendaArticuloForm(a={}){
+  const tipo=a.tipo||'archivo';
+  return `<div class="form-grid">
+  <div class="field"><label>Tipo</label><select id="f-tipo" onchange="toggleTiendaArchivoField(this.value)">${TIENDA_TIPOS.map(([v,l])=>`<option value="${v}" ${tipo===v?'selected':''}>${l}</option>`).join('')}</select></div>
+  <div class="field"><label>Costo en monedas</label><input id="f-costo" type="number" min="1" value="${Number(a.costoMonedas)||100}"></div>
+  <div class="field form-full"><label>Nombre</label><input id="f-nombre" value="${esc(a.nombre)}"></div>
+  <div class="field"><label>Categoría</label><input id="f-categoria" value="${esc(a.categoria||'Plantillas')}"></div>
+  <div class="field form-full"><label>Descripción (la ve el socio antes de canjear)</label><textarea id="f-descripcion" rows="2">${esc(a.descripcion)}</textarea></div>
+  <div class="field form-full" id="f-archivo-wrap" style="display:${tipo==='archivo'?'block':'none'}"><label>URL del archivo (Google Drive, enlace "cualquiera con el enlace")</label><input id="f-archivo" value="${esc(a.archivoUrl)}" placeholder="https://drive.google.com/..."></div>
+  <div class="field form-full"><label style="display:flex;align-items:center;gap:8px;font-weight:600"><input type="checkbox" id="f-activo" ${a.activo===false?'':'checked'}> Activo (aparece en la tienda)</label></div>
+</div>`;}
+function toggleTiendaArchivoField(tipo){const w=document.getElementById('f-archivo-wrap');if(w)w.style.display=tipo==='archivo'?'block':'none';}
+function newTiendaArticulo(){openForm('Nuevo artículo',tiendaArticuloForm(),()=>saveTiendaArticulo(null));}
+function saveTiendaArticulo(id){
+  const d={
+    tipo:fv('f-tipo')||'archivo',
+    costoMonedas:Math.max(1,Number(fv('f-costo'))||0),
+    nombre:fv('f-nombre').trim(),
+    categoria:fv('f-categoria').trim(),
+    descripcion:fv('f-descripcion').trim(),
+    archivoUrl:fv('f-archivo').trim(),
+    activo:document.getElementById('f-activo')?.checked!==false
+  };
+  if(!d.nombre)return toast('El nombre es obligatorio');
+  if(!d.descripcion)return toast('La descripción es obligatoria');
+  if(d.tipo==='archivo'&&!d.archivoUrl)return toast('Falta la URL del archivo');
+  if(d.tipo==='curso_anticipado')d.archivoUrl='';
+  saveDoc('tienda_articulos',id,d);
+}
+function tiendaArticuloRowCard(a){
+  return `<div class="mat-row" onclick="editItem('tienda_articulos','${a.id}')">
+    <div class="mat-row__thumb" style="background:var(--rojo-50);color:var(--rojo);display:grid;place-items:center;font-weight:800;font-size:.82rem">${a.tipo==='curso_anticipado'?'📚':'📄'}</div>
+    <div class="mat-row__body">
+      <div class="mat-row__title">${esc(a.nombre)}</div>
+      <div class="mat-row__meta"><span class="mat-row__curso">${esc(a.categoria||'Sin categoría')} · ${Number(a.costoMonedas)||0} monedas</span></div>
+    </div>
+    <span class="tag ${a.activo===false?'gray':''}">${a.activo===false?'Inactivo':'Activo'}</span>
+    <div class="row-actions" onclick="event.stopPropagation()">
+      <button class="ico-btn" onclick="editItem('tienda_articulos','${a.id}')" title="Editar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+      <button class="ico-btn del" onclick="delItem('tienda_articulos','${a.id}')" title="Eliminar"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+    </div>
+  </div>`;
+}
+function renderTienda(){
+  const list=DATA.tienda_articulos||[];
+  const activos=list.filter(a=>a.activo!==false).length;
+  return `<div class="page-head"><div>
+    <div class="pill-eyebrow">Zona de Juegos</div>
+    <h1 class="page-h">Tienda de recompensas</h1><p class="page-sub">Lo que los socios canjean con las monedas que ganan jugando. El archivo real solo se revela después de canjear.</p></div>
+    <button class="btn-add" onclick="newTiendaArticulo()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>Nuevo artículo</button>
+    </div>
+    <div class="stats" style="margin-bottom:20px">
+      ${statCard('Artículos totales',list.length,'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4')}
+      ${statCard('Activos en la tienda',activos,'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z')}
+    </div>
+    ${list.length?`<div class="mat-rows">${list.map(tiendaArticuloRowCard).join('')}</div>`:`<div class="card"><div class="empty"><b>Aún no hay artículos</b><span>Agrega una plantilla descargable o el desbloqueo anticipado de curso.</span></div></div>`}`;
+}
+
 /* ====== DIRECTORIO VIP (admin: moderar las tarjetas que arman los socios) ====== */
 function renderDirectorioAdmin(){
   return `<div class="page-head"><div>
@@ -2082,7 +2149,8 @@ const COLL_MAP={cursos:{data:'cursos',form:cursoForm,save:saveCurso,title:'Edita
   material:{data:'material',form:materialForm,save:saveMaterial,title:'Editar material'},
   certificados:{data:'certificados',form:certificadoForm,save:saveCertificado,title:'Editar certificado'},
   datos_curiosos:{data:'datos_curiosos',form:datoCuriosoForm,save:saveDatoCurioso,title:'Editar dato'},
-  preguntas:{data:'preguntas',form:preguntaForm,save:savePregunta,title:'Editar pregunta'},retos_visuales:{data:'retos_visuales',form:retoVisualForm,save:saveRetoVisual,title:'Editar reto visual'}};
+  preguntas:{data:'preguntas',form:preguntaForm,save:savePregunta,title:'Editar pregunta'},retos_visuales:{data:'retos_visuales',form:retoVisualForm,save:saveRetoVisual,title:'Editar reto visual'},
+  tienda_articulos:{data:'tienda_articulos',form:tiendaArticuloForm,save:saveTiendaArticulo,title:'Editar artículo de tienda'}};
 function editItem(coll,id){
   const cfg=COLL_MAP[coll];const item=DATA[cfg.data].find(x=>x.id===id);if(!item)return;
   const title=coll==='cursos'?`Editar curso<span style="display:block;font-size:.8rem;font-weight:500;color:var(--muted);margin-top:3px">${esc(item.titulo||'')}</span>`:cfg.title;
@@ -2147,14 +2215,14 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
   // Modo real: arranca vacío y solo se llena con Firestore. El demo aplica únicamente sin Firebase.
-  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[]};
+  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[]};
   if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[]};return;}
   // Cada colección se trae por separado y con su propio catch: una colección
   // sin reglas desplegadas todavía (ej. certificados, antes de pegar las
   // reglas nuevas en Firebase Console) no debe tumbar el resto del panel.
   const safeGet=(c)=>db.collection(c).get().catch(e=>{console.warn(`Firestore (${c}):`,e.message);return {docs:[]};});
   try{
-    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas','retos_visuales'];
+    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas','retos_visuales','tienda_articulos'];
     const snaps=await Promise.all(cols.map(safeGet));
     cols.forEach((c,i)=>{DATA[c]=snaps[i].docs.map(d=>({id:d.id,...d.data()}));});
     const foro=await safeGet('foro_temas');DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
