@@ -245,7 +245,7 @@ function miembroVerificable(m){
 function renderDashboard(){
   const precio=+(_appCfg.precio)||499;
   const miembrosVerificados=DATA.miembros.filter(miembroVerificable);
-  const activos=miembrosVerificados.filter(m=>(m.estado||'Activo')!=='Cancelado').length;
+  const activos=miembrosVerificados.filter(m=>m.estado==='Activo').length;
   const totalMiembros=miembrosVerificados.length;
   const pctActivos=totalMiembros?Math.round(activos/totalMiembros*100):0;
   const mrr=activos*precio;
@@ -276,7 +276,7 @@ function renderDashboard(){
     <div class="card">
       <div class="dash-card-head"><b>Últimos miembros</b><a onclick="go('miembros')">Ver todos →</a></div>
       ${[...miembrosVerificados].sort((a,b)=>fechaMiembro(b)-fechaMiembro(a)).slice(0,5).map(m=>{
-        const activo=(m.estado||'Activo')!=='Cancelado';
+        const activo=m.estado==='Activo';
         const nombre=nombreMiembro(m),correo=correoMiembro(m);
         return `<div class="dash-row"><div class="dash-row-av">${esc(nombre[0].toUpperCase())}</div>
           <div class="dash-row-body"><b>${esc(nombre)}</b><span>${esc(correo)}</span></div>
@@ -1393,7 +1393,7 @@ let _mbPlan='todos', _mbEstado='todos';
 function miembroPlan(m){
   if(m.plan)return m.plan;
   if((m.diasRegalados||0)>0)return 'Regalo';
-  if((m.estado||'Activo')==='Activo'&&m.vigenciaHasta)return 'Membresía';
+  if(m.estado==='Activo'&&m.vigenciaHasta)return 'Membresía';
   return 'Sin pagar';
 }
 function miembrosFiltrados(){
@@ -1401,7 +1401,7 @@ function miembrosFiltrados(){
   let list=DATA.miembros.slice();
   if(q)list=list.filter(m=>[m.nombre,m.email,m.ciudad].join(' ').toLowerCase().includes(q));
   if(_mbPlan!=='todos')list=list.filter(m=>miembroPlan(m)===_mbPlan);
-  if(_mbEstado!=='todos')list=list.filter(m=>(m.estado||'Activo')===_mbEstado);
+  if(_mbEstado!=='todos')list=list.filter(m=>m.estado===_mbEstado);
   return list;
 }
 function mbPillsPlan(){
@@ -1412,7 +1412,7 @@ function mbPillsPlan(){
   return html;
 }
 function mbPillsEstado(){
-  const counts={};DATA.miembros.forEach(m=>{const e=m.estado||'Activo';counts[e]=(counts[e]||0)+1;});
+  const counts={};DATA.miembros.forEach(m=>{const e=m.estado;if(e)counts[e]=(counts[e]||0)+1;});
   let html=`<button class="chip ${_mbEstado==='todos'?'active':''}" onclick="setMbEstado('todos')">Todos los estados <span class="chip-count">${DATA.miembros.length}</span></button>`;
   html+=['Activo','Cancelado','Suspendido'].filter(e=>counts[e]).map(e=>`<button class="chip ${_mbEstado===e?'active':''}" onclick="setMbEstado('${e}')">${e==='Activo'?'Activos':e==='Cancelado'?'Cancelados':'Suspendidos'} <span class="chip-count">${counts[e]}</span></button>`).join('');
   return html;
@@ -1421,9 +1421,9 @@ function setMbPlan(p){_mbPlan=p;renderSection('miembros');}
 function setMbEstado(e){_mbEstado=e;renderSection('miembros');}
 function miembroCard(m){
   const plan=miembroPlan(m);
-  const estado=m.estado||'Activo';
+  const estado=m.estado||'';
   const planClass=plan==='Mensual'?'tag amber':plan==='Anual'?'tag':plan==='Regalo'?'tag purple':'tag gray';
-  const estTag=estado==='Cancelado'?'<span class="tag gray">CANCELADO</span>':estado==='Suspendido'?'<span class="tag">SUSPENDIDO</span>':'<span class="tag green">ACTIVO</span>';
+  const estTag=estado==='Cancelado'?'<span class="tag gray">CANCELADO</span>':estado==='Suspendido'?'<span class="tag">SUSPENDIDO</span>':estado==='Activo'?'<span class="tag green">ACTIVO</span>':'<span class="tag gray">SIN PAGAR</span>';
   return `<div class="mb-card">
     <div class="mb-av">${esc((m.nombre||'U')[0].toUpperCase())}</div>
     <div class="mb-body">
@@ -1449,8 +1449,7 @@ function renderMiembros(){
 function verMiembro(id){abrirAccionesMiembro(id);}
 function abrirAccionesMiembro(id){
   const m=DATA.miembros.find(x=>x.id===id);if(!m)return;
-  const estado=m.estado||'Activo';
-  const activo=estado==='Activo';
+  const activo=m.estado==='Activo';
   const plan=miembroPlan(m);
   document.getElementById('modal-content').innerHTML=`
     <div class="modal-head"><h3>Acciones del miembro</h3><button class="modal-x" onclick="closeModal()">✕</button></div>
