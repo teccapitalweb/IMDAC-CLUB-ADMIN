@@ -41,7 +41,7 @@ try{
 }catch(e){ console.warn("Firebase sin configurar — modo demo.",e); }
 
 let CURRENT_USER=null;
-let DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[]};
+let DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],encuestas:[]};
 let CATS=["Estructuras","Instalaciones","Costos y Presupuestos","Topografía","Diseño CAD","Normatividad","Sustentabilidad","Gestión de Obra"];
 const NIVELES=["Básico","Intermedio","Avanzado"];
 const ESTADOS=["Publicado","Borrador"];
@@ -141,7 +141,7 @@ const NAV=[
   {id:"metricas",label:"Métricas",icon:'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2',needsData:true},
   {id:"pruebas",label:"Pruebas gratuitas",icon:'M9 3v4a1 1 0 01-.3.7L5 11.4V19a2 2 0 002 2h10a2 2 0 002-2v-7.6l-3.7-3.7A1 1 0 0115 7V3M9 3h6M9 3H7m8 0h2',needsData:true},
   {id:"pruebasvip",label:"Pruebas VIP",icon:'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z',needsData:true},
-  {id:"encuesta",label:"Encuesta de clientes",icon:'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-6l-4 4v-4z',needsData:true},
+  {id:"encuesta",label:"Encuesta de clientes",group:"Comunidad",icon:'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-6l-4 4v-4z'},
 ];
 /* El menú se partió en dos: las secciones que hacen algo de verdad arriba,
    agrupadas con los mismos encabezados que el nav de DulceLab (Resumen,
@@ -199,7 +199,7 @@ function renderSection(sec){
   const R={dashboard:renderDashboard,cursos:renderCursos,webinars:renderWebinars,noticias:renderNoticias,
     material:renderMaterial,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig,verpanel:renderVerPanel,
     certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,retosvisuales:renderRetosVisuales,tienda:renderTienda,
-    metricas:()=>renderSinDatos('metricas'),pruebas:()=>renderSinDatos('pruebas'),pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:()=>renderSinDatos('encuesta')};
+    metricas:()=>renderSinDatos('metricas'),pruebas:()=>renderSinDatos('pruebas'),pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:renderEncuesta};
   document.getElementById('content').innerHTML=`<div class="section active">${(R[sec]||renderDashboard)()}</div>`;
 }
 /* Secciones que existen en el nav de DulceLab pero cuya fuente de datos no
@@ -210,12 +210,19 @@ const SIN_DATOS_INFO={
   metricas:{titulo:'Métricas',falta:'No hay un pipeline de analítica (retención, uso por curso, etc.) escribiendo a Firestore todavía. DulceLab calcula esto desde eventos que su webhook sí registra.'},
   pruebas:{titulo:'Pruebas gratuitas',falta:'IMDAC no guarda qué curso eligió cada cuenta de prueba ni cuándo expira — ese campo (cursoPrueba / progreso) no existe en el modelo de datos actual.'},
   pruebasvip:{titulo:'Pruebas VIP',falta:'No existe un flujo de "prueba VIP por tiempo limitado" en IMDAC — ni el campo en miembros ni la lógica que lo otorgue.'},
-  encuesta:{titulo:'Encuesta de clientes',falta:'No existe todavía un formulario de encuesta ni una colección donde se guarden las respuestas.'},
 };
 function renderSinDatos(id){
   const info=SIN_DATOS_INFO[id]||{titulo:'Sección',falta:'Falta definir de dónde saldrían estos datos.'};
   return `<div class="page-head"><div><h1 class="page-h">${info.titulo}</h1><p class="page-sub">Esta sección existe en DulceLab pero IMDAC todavía no tiene datos reales para llenarla.</p></div></div>
   <div class="card"><div class="empty"><b>Sin fuente de datos todavía</b><span>${esc(info.falta)}</span></div></div>`;
+}
+
+function renderEncuesta(){
+  const list=[...(DATA.encuestas||[])];
+  const fecha=e=>e.creado?new Date(e.creado).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'}):'Fecha pendiente';
+  return `<div class="page-head"><div><div class="pill-eyebrow">Ruta IMDAC · Datos reales</div><h1 class="page-h">Encuesta de clientes</h1><p class="page-sub">Respuestas anónimas de visitantes que terminaron su ruta de aprendizaje en IMDAC México.</p></div><button class="btn-add" onclick="reload()">Actualizar</button></div>
+  <div class="stats">${statCard('Respuestas recibidas',list.length,'Sin datos personales','M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-6l-4 4v-4z')}${statCard('Ruta más reciente',list[0]?.recomendacion||'—','Según intereses seleccionados','M12 2l3 7h7l-5.5 4 2 7-6.5-4.2L5.5 20l2-7L2 9h7z')}</div>
+  <div class="card">${list.length?`<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Perfil</th><th>Intereses / respuestas</th><th>Recomendación</th></tr></thead><tbody>${list.map(e=>`<tr><td>${esc(fecha(e))}</td><td><b>${esc(e.perfil)}</b></td><td>${esc((e.respuestas||[]).join(' · ')||'—')}</td><td><span class="badge badge-ok">${esc(e.recomendacion)}</span></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>Aún no hay respuestas</b><span>Cuando un visitante termine la ruta de IMDAC México, aparecerá aquí.</span></div>`}</div>`;
 }
 
 /* ====== DASHBOARD ====== */
@@ -2216,7 +2223,7 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
   // Modo real: arranca vacío y solo se llena con Firestore. El demo aplica únicamente sin Firebase.
-  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[]};
+  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[],encuestas:[]};
   if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[]};return;}
   // Cada colección se trae por separado y con su propio catch: una colección
   // sin reglas desplegadas todavía (ej. certificados, antes de pegar las
@@ -2231,6 +2238,7 @@ async function loadData(){
     const notif=await db.collection('notificaciones').orderBy('fecha','desc').get().catch(e=>{console.warn('Firestore (notificaciones):',e.message);return {docs:[]};});DATA.notificaciones=notif.docs.map(d=>({id:d.id,...d.data()}));
     const cfg=await db.collection('config').doc('app').get().catch(()=>({exists:false}));if(cfg.exists){_appCfg=cfg.data();if(Array.isArray(_appCfg.categorias)&&_appCfg.categorias.length)CATS=_appCfg.categorias;}
     const adminsSnap=await safeGet('admins');DATA.admins=adminsSnap.docs.map(d=>({id:d.id,...d.data()}));
+    try{const survey=await apiFetch('/admin/encuestas-clientes',{method:'GET'});DATA.encuestas=Array.isArray(survey.encuestas)?survey.encuestas:[];}catch(e){console.warn('Encuestas:',e.message);}
   }catch(e){console.warn('Firestore:',e.message);}
 }
 
