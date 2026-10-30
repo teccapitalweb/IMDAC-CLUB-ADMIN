@@ -1118,7 +1118,7 @@ function saveMaterial(id){
   saveDoc('material',id,d);
 }
 
-/* ====== Quiz del Arquitecto (Zona de Juegos, Fase 1) ======
+/* ====== Quiz del Arquitecto (Zona de Retos, Fase 1) ======
    El socio nunca lee esta colección directo (firestore.rules la deja solo
    para isAdmin()) -- ve las preguntas filtradas vía /preguntas-quiz y se
    califican en /quiz-responder, ambos en el webhook. Categorías fijas por
@@ -1191,7 +1191,7 @@ function preguntasListaHTML(){
 function renderPreguntas(){
   const st=preguntasStats();
   return `<div class="page-head"><div>
-    <div class="pill-eyebrow">Zona de Juegos</div>
+    <div class="pill-eyebrow">Zona de Retos</div>
     <h1 class="page-h">Quiz del Arquitecto</h1><p class="page-sub">Banco de preguntas del quiz. Jugar es libre para cualquier socio; ganar monedas requiere membresía activa.</p></div>
     <button class="btn-add" onclick="newPregunta()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>Nueva pregunta</button>
     </div>
@@ -1207,7 +1207,7 @@ function renderPreguntas(){
 function retoVisualForm(r={}){return `<div class="form-grid"><div class="field form-full"><label>Título</label><input id="f-titulo" value="${esc(r.titulo)}"></div><div class="field"><label>Categoría</label><input id="f-categoria" value="${esc(r.categoria||'Seguridad')}"></div><div class="field"><label>Dificultad</label><select id="f-dificultad">${QUIZ_DIFICULTADES.map(([v,l])=>`<option value="${v}" ${r.dificultad===v?'selected':''}>${l}</option>`).join('')}</select></div><div class="field form-full"><label>URL de la fotografía</label><input id="f-imagen" value="${esc(r.imagen)}" placeholder="https://…"></div><div class="field form-full"><label>Fuente verificable (URL)</label><input id="f-fuente" value="${esc(r.fuente)}"></div><div class="field form-full"><label>Crédito / licencia</label><input id="f-credito" value="${esc(r.credito)}"></div><div class="field form-full"><label>Instrucción</label><textarea id="f-descripcion" rows="2">${esc(r.descripcion)}</textarea></div><div class="field form-full"><label>Pista</label><input id="f-pista" value="${esc(r.pista)}"></div><div class="field form-full"><label>Zonas correctas (JSON, coordenadas 0–100)</label><textarea id="f-zonas" rows="8" placeholder='[{"id":"zona-1","x":10,"y":20,"w":15,"h":12,"titulo":"Aspecto a revisar","feedback":"Explicación técnica prudente."}]'>${esc(JSON.stringify(r.zonas||[],null,2))}</textarea><small>Publica solo fotos reales con fuente y crédito. Usa “aspecto a revisar” si la imagen no permite confirmar un incumplimiento.</small></div><div class="field form-full"><label><input type="checkbox" id="f-activo" ${r.activo===false?'':'checked'}> Activo</label></div></div>`;}
 function newRetoVisual(){openForm('Nuevo reto visual',retoVisualForm(),()=>saveRetoVisual(null));}
 function saveRetoVisual(id){let zonas=[];try{zonas=JSON.parse(fv('f-zonas')||'[]');}catch(e){return toast('Las zonas deben estar en JSON válido');}const d={titulo:fv('f-titulo').trim(),categoria:fv('f-categoria').trim(),dificultad:fv('f-dificultad')||'facil',imagen:fv('f-imagen').trim(),fuente:fv('f-fuente').trim(),credito:fv('f-credito').trim(),descripcion:fv('f-descripcion').trim(),pista:fv('f-pista').trim(),zonas,activo:document.getElementById('f-activo')?.checked!==false};if(!d.titulo||!d.imagen||!d.fuente||!d.credito)return toast('Título, foto, fuente y crédito son obligatorios');if(!Array.isArray(zonas)||!zonas.length)return toast('Agrega al menos una zona');saveDoc('retos_visuales',id,d);}
-function renderRetosVisuales(){const list=DATA.retos_visuales||[];return `<div class="page-head"><div><div class="pill-eyebrow">Zona de Juegos</div><h1 class="page-h">Detecta el error</h1><p class="page-sub">Carga la foto, su fuente verificable y zonas en porcentajes para el juego.</p></div><button class="btn-add" onclick="newRetoVisual()">+ Nuevo reto</button></div>${list.length?`<div class="mat-rows">${list.map(r=>`<div class="mat-row" onclick="editItem('retos_visuales','${r.id}')"><div class="mat-row__thumb" style="background-image:url('${esc(driveImg(r.imagen))}')"></div><div class="mat-row__body"><div class="mat-row__title">${esc(r.titulo)}</div><div class="mat-row__meta"><span>${esc(r.categoria)} · ${(r.zonas||[]).length} zonas</span></div></div><span class="tag ${r.activo===false?'gray':''}">${r.activo===false?'Inactivo':'Activo'}</span></div>`).join('')}</div>`:`<div class="card"><div class="empty"><b>Aún no hay retos</b><span>Agrega una fotografía real y define las zonas revisables.</span></div></div>`}`;}
+function renderRetosVisuales(){const list=DATA.retos_visuales||[];return `<div class="page-head"><div><div class="pill-eyebrow">Zona de Retos</div><h1 class="page-h">Detecta el error</h1><p class="page-sub">Carga la foto, su fuente verificable y zonas en porcentajes para el juego.</p></div><button class="btn-add" onclick="newRetoVisual()">+ Nuevo reto</button></div>${list.length?`<div class="mat-rows">${list.map(r=>`<div class="mat-row" onclick="editItem('retos_visuales','${r.id}')"><div class="mat-row__thumb" style="background-image:url('${esc(driveImg(r.imagen))}')"></div><div class="mat-row__body"><div class="mat-row__title">${esc(r.titulo)}</div><div class="mat-row__meta"><span>${esc(r.categoria)} · ${(r.zonas||[]).length} zonas</span></div></div><span class="tag ${r.activo===false?'gray':''}">${r.activo===false?'Inactivo':'Activo'}</span></div>`).join('')}</div>`:`<div class="card"><div class="empty"><b>Aún no hay retos</b><span>Agrega una fotografía real y define las zonas revisables.</span></div></div>`}`;}
 
 /* ====== TIENDA DE RECOMPENSAS ======
    Dos tipos de artículo: 'archivo' (plantilla/PDF descargable, vive en
@@ -1264,7 +1264,7 @@ function renderTienda(){
   const list=DATA.tienda_articulos||[];
   const activos=list.filter(a=>a.activo!==false).length;
   return `<div class="page-head"><div>
-    <div class="pill-eyebrow">Zona de Juegos</div>
+    <div class="pill-eyebrow">Zona de Retos</div>
     <h1 class="page-h">Tienda de recompensas</h1><p class="page-sub">Lo que los socios canjean con las monedas que ganan jugando. El archivo real solo se revela después de canjear.</p></div>
     <button class="btn-add" onclick="newTiendaArticulo()"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>Nuevo artículo</button>
     </div>
