@@ -1226,6 +1226,7 @@ function tiendaArticuloForm(a={}){
   <div class="field"><label>Categoría</label><input id="f-categoria" value="${esc(a.categoria||'Plantillas')}"></div>
   <div class="field form-full"><label>Descripción (la ve el socio antes de canjear)</label><textarea id="f-descripcion" rows="2">${esc(a.descripcion)}</textarea></div>
   <div class="field form-full" id="f-archivo-wrap" style="display:${tipo==='archivo'?'block':'none'}"><label>URL del archivo (Google Drive, enlace "cualquiera con el enlace")</label><input id="f-archivo" value="${esc(a.archivoUrl)}" placeholder="https://drive.google.com/..."></div>
+  <div class="field form-full"><label>Portada (URL de Drive o imagen directa, enlace "cualquiera con el enlace")</label><input id="f-img" value="${esc(a.img)}" placeholder="https://drive.google.com/..."></div>
   <div class="field form-full"><label style="display:flex;align-items:center;gap:8px;font-weight:600"><input type="checkbox" id="f-activo" ${a.activo===false?'':'checked'}> Activo (aparece en la tienda)</label></div>
 </div>`;}
 function toggleTiendaArchivoField(tipo){const w=document.getElementById('f-archivo-wrap');if(w)w.style.display=tipo==='archivo'?'block':'none';}
@@ -1238,6 +1239,7 @@ function saveTiendaArticulo(id){
     categoria:fv('f-categoria').trim(),
     descripcion:fv('f-descripcion').trim(),
     archivoUrl:fv('f-archivo').trim(),
+    img:fv('f-img').trim(),
     activo:document.getElementById('f-activo')?.checked!==false
   };
   if(!d.nombre)return toast('El nombre es obligatorio');
@@ -1248,7 +1250,7 @@ function saveTiendaArticulo(id){
 }
 function tiendaArticuloRowCard(a){
   return `<div class="mat-row" onclick="editItem('tienda_articulos','${a.id}')">
-    <div class="mat-row__thumb" style="background:var(--rojo-50);color:var(--rojo);display:grid;place-items:center;font-weight:800;font-size:.82rem">${a.tipo==='curso_anticipado'?'📚':'📄'}</div>
+    <div class="mat-row__thumb" style="${a.img?`background-image:url('${esc(driveImg(a.img))}')`:'background:var(--rojo-50);color:var(--rojo);display:grid;place-items:center;font-weight:800;font-size:.82rem'}">${a.img?'':(a.tipo==='curso_anticipado'?'📚':'📄')}</div>
     <div class="mat-row__body">
       <div class="mat-row__title">${esc(a.nombre)}</div>
       <div class="mat-row__meta"><span class="mat-row__curso">${esc(a.categoria||'Sin categoría')} · ${Number(a.costoMonedas)||0} monedas</span></div>
