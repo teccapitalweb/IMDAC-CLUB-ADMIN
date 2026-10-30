@@ -220,9 +220,18 @@ function renderSinDatos(id){
 function renderEncuesta(){
   const list=[...(DATA.encuestas||[])];
   const fecha=e=>e.creado?new Date(e.creado).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'}):'Fecha pendiente';
+  const colores=['#ff2c2c','#8d1b25','#f59e0b','#3b82f6','#16a34a','#9333ea','#0891b2','#ec4899'];
+  const conteo=values=>values.reduce((acc,value)=>{const label=String(value||'Sin respuesta');acc[label]=(acc[label]||0)+1;return acc;},{});
+  const pastel=(titulo,subtitulo,values)=>{
+    const datos=Object.entries(conteo(values)).sort((a,b)=>b[1]-a[1]);
+    if(!datos.length)return `<article class="survey-chart"><h3>${esc(titulo)}</h3><p>${esc(subtitulo)}</p><div class="survey-empty">Aún no hay datos suficientes.</div></article>`;
+    const total=datos.reduce((sum,[,cantidad])=>sum+cantidad,0);let desde=0;
+    const segmentos=datos.map(([,cantidad],i)=>{const hasta=desde+(cantidad/total*100);const color=colores[i%colores.length];const tramo=`${color} ${desde.toFixed(2)}% ${hasta.toFixed(2)}%`;desde=hasta;return tramo;}).join(',');
+    return `<article class="survey-chart"><h3>${esc(titulo)}</h3><p>${esc(subtitulo)}</p><div class="survey-chart-body"><div class="survey-pie" style="--pie:conic-gradient(${segmentos})"><strong>${total}</strong><span>respuestas</span></div><ul class="survey-legend">${datos.map(([label,cantidad],i)=>`<li><i style="background:${colores[i%colores.length]}"></i><span>${esc(label)}</span><b>${cantidad}</b></li>`).join('')}</ul></div></article>`;
+  };
   return `<div class="page-head"><div><div class="pill-eyebrow">Ruta IMDAC · Datos reales</div><h1 class="page-h">Encuesta de clientes</h1><p class="page-sub">Respuestas anónimas de visitantes que terminaron su ruta de aprendizaje en IMDAC México.</p></div><button class="btn-add" onclick="reload()">Actualizar</button></div>
   <div class="stats">${statCard('Respuestas recibidas',list.length,'Sin datos personales','M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-6l-4 4v-4z')}${statCard('Ruta más reciente',list[0]?.recomendacion||'—','Según intereses seleccionados','M12 2l3 7h7l-5.5 4 2 7-6.5-4.2L5.5 20l2-7L2 9h7z')}</div>
-  <div class="card">${list.length?`<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Perfil</th><th>Intereses / respuestas</th><th>Recomendación</th></tr></thead><tbody>${list.map(e=>`<tr><td>${esc(fecha(e))}</td><td><b>${esc(e.perfil)}</b></td><td>${esc((e.respuestas||[]).join(' · ')||'—')}</td><td><span class="badge badge-ok">${esc(e.recomendacion)}</span></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>Aún no hay respuestas</b><span>Cuando un visitante termine la ruta de IMDAC México, aparecerá aquí.</span></div>`}</div>`;
+  ${list.length?`<section class="survey-charts">${pastel('Perfil de los visitantes','Cómo se describen al iniciar su ruta.',list.map(e=>e.perfil))}${pastel('Interés o área de crecimiento','La segunda decisión de cada visitante.',list.map(e=>(e.respuestas||[])[1]))}${pastel('Modalidad preferida','Cómo prefieren tomar su capacitación.',list.map(e=>{const r=e.respuestas||[];return r[r.length-1];}))}</section><section class="survey-recent card"><div class="survey-recent-head"><h2>Respuestas recientes</h2><span>Detalle de las últimas ${list.length} respuestas</span></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Perfil</th><th>Intereses / respuestas</th><th>Recomendación</th></tr></thead><tbody>${list.map(e=>`<tr><td>${esc(fecha(e))}</td><td><b>${esc(e.perfil)}</b></td><td>${esc((e.respuestas||[]).join(' · ')||'—')}</td><td><span class="tag green">${esc(e.recomendacion)}</span></td></tr>`).join('')}</tbody></table></div></section>`:`<div class="card"><div class="empty"><b>Aún no hay respuestas</b><span>Cuando un visitante termine la ruta de IMDAC México, aparecerá aquí.</span></div></div>`}`;
 }
 
 /* ====== DASHBOARD ====== */
