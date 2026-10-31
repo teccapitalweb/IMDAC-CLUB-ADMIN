@@ -109,6 +109,8 @@ function _discoverPickDaily(lib,n){
 }
 /* estado de búsqueda / filtros / paginación */
 let _search={}, _page={}, _filterCat='Todos', _filterEstado='Todos', _cursoSort='az', _cursoView='grid', _webinarFilter='proximas';
+let _metricasPeriodo='30';
+let _metricasExcluirMi=(()=>{try{return localStorage.getItem('imdac_metricas_notrack')!=='0';}catch(e){return true;}})();
 let _appCfg={};
 const PER_PAGE=8;
 
@@ -199,7 +201,7 @@ function renderSection(sec){
   const R={dashboard:renderDashboard,cursos:renderCursos,webinars:renderWebinars,noticias:renderNoticias,
     material:renderMaterial,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig,verpanel:renderVerPanel,
     certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,retosvisuales:renderRetosVisuales,tienda:renderTienda,
-    metricas:()=>renderSinDatos('metricas'),pruebas:renderPruebas,pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:renderEncuesta};
+    metricas:renderMetricas,pruebas:renderPruebas,pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:renderEncuesta};
   document.getElementById('content').innerHTML=`<div class="section active">${(R[sec]||renderDashboard)()}</div>`;
 }
 /* Secciones que existen en el nav de DulceLab pero cuya fuente de datos no
@@ -207,7 +209,6 @@ function renderSection(sec){
    o encuestas a Firestore). Decirlo aquí en vez de mostrar una tabla vacía
    sin explicación, o peor, números inventados. */
 const SIN_DATOS_INFO={
-  metricas:{titulo:'Métricas',falta:'No hay un pipeline de analítica (retención, uso por curso, etc.) escribiendo a Firestore todavía. DulceLab calcula esto desde eventos que su webhook sí registra.'},
   pruebasvip:{titulo:'Pruebas VIP',falta:'No existe un flujo de "prueba VIP por tiempo limitado" en IMDAC — ni el campo en miembros ni la lógica que lo otorgue.'},
 };
 function renderSinDatos(id){
@@ -310,6 +311,121 @@ function renderPruebas(){
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Miembro</th><th>Curso elegido</th><th>Estado</th><th>Fecha</th></tr></thead>
     <tbody>${ultimas.length?ultimas.map(filaPrueba).join(''):'<tr><td colspan="4"><div class="empty"><b>Aún no hay pruebas elegidas</b><span>Aparecerán aquí en cuanto un socio elija su curso gratuito.</span></div></td></tr>'}</tbody></table></div>
   </section>`;
+}
+
+/* ====== MÉTRICAS DE VISITAS ======
+   Primera entrega: lo esencial (visitas, personas distintas, cuentas
+   nuevas, páginas más vistas, dispositivos). El mapa de calor, el embudo
+   completo y las campañas UTM quedan para una siguiente entrega.
+   Los eventos los escribe el webhook (POST /track, sin auth obligatorio)
+   desde imdac-mexico (sitio público) y desde imdac-club (antes y después
+   de iniciar sesión) -- ver analytics_visitas en Firestore. */
+const METRICAS_PERIODOS={semana:7,'30':30,'90':90,'12m':365};
+function _miVidAdmin(){
+  try{
+    let v=localStorage.getItem('imdac_vid');
+    if(!v){v=(crypto.randomUUID?crypto.randomUUID():'v-'+Date.now()+'-'+Math.random().toString(16).slice(2));localStorage.setItem('imdac_vid',v);}
+    return v;
+  }catch(e){return '';}
+}
+function fechaVisita(v){
+  if(v?.creada?.toDate)return v.creada.toDate();
+  if(v?.creada)return new Date(v.creada);
+  return null;
+}
+function setMetricasPeriodo(p){_metricasPeriodo=p;renderSection('metricas');}
+function toggleMetricasExcluir(checked){
+  _metricasExcluirMi=checked;
+  try{localStorage.setItem('imdac_metricas_notrack',checked?'1':'0');}catch(e){}
+  renderSection('metricas');
+}
+function renderMetricas(){
+  const dias=METRICAS_PERIODOS[_metricasPeriodo]||30;
+  const desde=new Date();desde.setHours(0,0,0,0);desde.setDate(desde.getDate()-(dias-1));
+  const miVid=_miVidAdmin();
+  const todas=(DATA.analytics_visitas||[]).filter(v=>!_metricasExcluirMi||v.vid!==miVid);
+  const eventos=todas.filter(v=>{const f=fechaVisita(v);return f&&f>=desde;});
+
+  const visitas=eventos.length;
+  const vids=new Set(eventos.map(v=>v.vid).filter(Boolean));
+  const personas=vids.size;
+  const cuentasNuevas=(DATA.miembros||[]).filter(m=>fechaMiembro(m)>=desde.getTime()).length;
+  const promedio=dias?Math.round(visitas/dias):0;
+
+  // Visitas por día: agrupa por día si el periodo es corto, por semana si
+  // son 90 días, por mes si es 12 meses -- para no dibujar 365 barras.
+  const unidad=dias<=30?'dia':dias<=90?'semana':'mes';
+  const claveBucket=f=>{
+    if(unidad==='dia')return f.toISOString().slice(0,10);
+    if(unidad==='mes')return f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0');
+    const inicioSemana=new Date(f);inicioSemana.setDate(f.getDate()-f.getDay());
+    return inicioSemana.toISOString().slice(0,10);
+  };
+  const etiquetaBucket=k=>{
+    if(unidad==='mes'){const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('es-MX',{month:'short'});}
+    const d=new Date(k+'T00:00:00');
+    return unidad==='dia'?`${d.getDate()}/${d.getMonth()+1}`:`${d.getDate()}/${d.getMonth()+1}`;
+  };
+  const conteoBucket={};
+  eventos.forEach(v=>{const f=fechaVisita(v);if(!f)return;const k=claveBucket(f);conteoBucket[k]=(conteoBucket[k]||0)+1;});
+  const buckets=[];
+  const cursor=new Date(desde);
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  while(cursor<=hoy){
+    const k=claveBucket(cursor);
+    if(!buckets.length||buckets[buckets.length-1].k!==k)buckets.push({k,count:0});
+    cursor.setDate(cursor.getDate()+1);
+  }
+  buckets.forEach(b=>{b.count=conteoBucket[b.k]||0;});
+  const maxBucket=Math.max(1,...buckets.map(b=>b.count));
+  const pasoEtiqueta=Math.max(1,Math.ceil(buckets.length/10));
+
+  const porPagina={};
+  eventos.forEach(v=>{const p=v.pagina||v.ruta||'—';porPagina[p]=(porPagina[p]||0)+1;});
+  const paginasTop=Object.entries(porPagina).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxPagina=paginasTop.length?paginasTop[0][1]:0;
+
+  const porDispositivo={movil:0,computadora:0,tablet:0};
+  eventos.forEach(v=>{const d=porDispositivo.hasOwnProperty(v.dispositivo)?v.dispositivo:'computadora';porDispositivo[d]++;});
+  const dispColores={movil:'#ff2c2c',computadora:'#3b82f6',tablet:'#f59e0b'};
+  const dispLabel={movil:'Celular',computadora:'Computadora',tablet:'Tableta'};
+  const dispDatos=Object.entries(porDispositivo).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]);
+  let desdePct=0;
+  const segmentos=dispDatos.map(([k,n])=>{const hasta=desdePct+(visitas?n/visitas*100:0);const tramo=`${dispColores[k]} ${desdePct.toFixed(2)}% ${hasta.toFixed(2)}%`;desdePct=hasta;return tramo;}).join(',');
+
+  const periodoBtn=(val,label)=>`<button class="${_metricasPeriodo===val?'active':''}" onclick="setMetricasPeriodo('${val}')">${label}</button>`;
+
+  return `<div class="page-head"><div><div class="pill-eyebrow">Ruta IMDAC · Datos reales</div><h1 class="page-h">Métricas de visitas</h1><p class="page-sub">Cuánta gente visita IMDAC (sitio público y Club) y desde qué dispositivo. El conteo es anónimo.</p></div></div>
+  <div class="card" style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:22px">
+    <div class="live-filters" style="display:flex;gap:8px">${periodoBtn('semana','Semana')}${periodoBtn('30','30 días')}${periodoBtn('90','90 días')}${periodoBtn('12m','12 meses')}</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:.84rem;color:var(--muted)"><input type="checkbox" ${_metricasExcluirMi?'checked':''} onchange="toggleMetricasExcluir(this.checked)"> No contar mis visitas en este navegador</label>
+    <button class="btn-ghost" onclick="reload()">Actualizar</button>
+  </div>
+  <div class="stats">
+    ${kpiCard('Visitas',visitas,'Páginas vistas','M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z')}
+    ${kpiCard('Personas distintas',personas,'Visitantes únicos del periodo','M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z')}
+    ${kpiCard('Cuentas nuevas',cuentasNuevas,'Personas que crearon su cuenta','M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z')}
+    ${kpiCard('Promedio por día',promedio,`${visitas} visita${visitas!==1?'s':''} en ${dias} día${dias!==1?'s':''}`,'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14')}
+  </div>
+  <div class="card" style="padding:22px;margin-bottom:22px">
+    <h3 style="font-family:var(--font-display);font-size:1.02rem;margin:0 0 4px">Visitas por día</h3>
+    <p style="font-size:.78rem;color:var(--muted);margin:0 0 4px">Visitas durante el periodo seleccionado.</p>
+    <div class="pb-daychart">
+      ${buckets.map((b,i)=>`<div class="pb-day" title="${b.count} visita(s)"><div class="pb-day-bar" style="height:${b.count?Math.max(6,Math.round(b.count/maxBucket*100)):2}%"></div><span>${i%pasoEtiqueta===0?etiquetaBucket(b.k):''}</span></div>`).join('')}
+    </div>
+  </div>
+  <div class="pruebas-cols">
+    <div class="card" style="padding:22px">
+      <h3 style="font-family:var(--font-display);font-size:1.02rem;margin:0 0 4px">Páginas más vistas</h3>
+      <p style="font-size:.78rem;color:var(--muted);margin:0 0 16px">Por dónde entra la gente.</p>
+      ${paginasTop.length?paginasTop.map(([pagina,count])=>`<div class="pb-bar-row"><span class="pb-bar-label">${esc(pagina)}</span><div class="pb-bar-track"><div class="pb-bar-fill" style="width:${maxPagina?Math.round(count/maxPagina*100):0}%"></div></div><b>${count}</b></div>`).join(''):'<div class="survey-empty">Aún no hay visitas en este periodo.</div>'}
+    </div>
+    <div class="card" style="padding:22px">
+      <h3 style="font-family:var(--font-display);font-size:1.02rem;margin:0 0 4px">Dispositivos</h3>
+      <p style="font-size:.78rem;color:var(--muted);margin:0 0 16px">Desde qué aparato entra la gente.</p>
+      ${dispDatos.length?`<div class="survey-chart-body"><div class="survey-pie" style="--pie:conic-gradient(${segmentos})"><strong>${visitas}</strong><span>visitas</span></div><ul class="survey-legend">${dispDatos.map(([k,n])=>`<li><i style="background:${dispColores[k]}"></i><span>${dispLabel[k]}</span><b>${n} · ${visitas?Math.round(n/visitas*100):0}%</b></li>`).join('')}</ul></div>`:'<div class="survey-empty">Aún no hay visitas en este periodo.</div>'}
+    </div>
+  </div>`;
 }
 
 /* ====== DASHBOARD ====== */
@@ -2310,8 +2426,8 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
   // Modo real: arranca vacío y solo se llena con Firestore. El demo aplica únicamente sin Firebase.
-  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[],encuestas:[],progreso:[]};
-  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],progreso:[]};return;}
+  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[],encuestas:[],progreso:[],analytics_visitas:[]};
+  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],progreso:[],analytics_visitas:[]};return;}
   // Cada colección se trae por separado y con su propio catch: una colección
   // sin reglas desplegadas todavía (ej. certificados, antes de pegar las
   // reglas nuevas en Firebase Console) no debe tumbar el resto del panel.
@@ -2321,6 +2437,8 @@ async function loadData(){
     const snaps=await Promise.all(cols.map(safeGet));
     cols.forEach((c,i)=>{DATA[c]=snaps[i].docs.map(d=>({id:d.id,...d.data()}));});
     const foro=await safeGet('foro_temas');DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
+    const visitas=await db.collection('analytics_visitas').orderBy('creada','desc').limit(20000).get().catch(e=>{console.warn('Firestore (analytics_visitas):',e.message);return {docs:[]};});
+    DATA.analytics_visitas=visitas.docs.map(d=>({id:d.id,...d.data()}));
     const miem=await safeGet('miembros');DATA.miembros=miem.docs.map(d=>{const x=d.data();return {id:d.id,...x,alta:x.creado?.toDate?x.creado.toDate().toLocaleDateString('es-MX'):'—'};});
     const notif=await db.collection('notificaciones').orderBy('fecha','desc').get().catch(e=>{console.warn('Firestore (notificaciones):',e.message);return {docs:[]};});DATA.notificaciones=notif.docs.map(d=>({id:d.id,...d.data()}));
     const cfg=await db.collection('config').doc('app').get().catch(()=>({exists:false}));if(cfg.exists){_appCfg=cfg.data();if(Array.isArray(_appCfg.categorias)&&_appCfg.categorias.length)CATS=_appCfg.categorias;}
