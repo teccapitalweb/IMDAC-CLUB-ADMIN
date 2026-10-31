@@ -199,7 +199,7 @@ function renderSection(sec){
   const R={dashboard:renderDashboard,cursos:renderCursos,webinars:renderWebinars,noticias:renderNoticias,
     material:renderMaterial,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig,verpanel:renderVerPanel,
     certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,retosvisuales:renderRetosVisuales,tienda:renderTienda,
-    metricas:()=>renderSinDatos('metricas'),pruebas:()=>renderSinDatos('pruebas'),pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:renderEncuesta};
+    metricas:()=>renderSinDatos('metricas'),pruebas:renderPruebas,pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:renderEncuesta};
   document.getElementById('content').innerHTML=`<div class="section active">${(R[sec]||renderDashboard)()}</div>`;
 }
 /* Secciones que existen en el nav de DulceLab pero cuya fuente de datos no
@@ -208,7 +208,6 @@ function renderSection(sec){
    sin explicación, o peor, números inventados. */
 const SIN_DATOS_INFO={
   metricas:{titulo:'Métricas',falta:'No hay un pipeline de analítica (retención, uso por curso, etc.) escribiendo a Firestore todavía. DulceLab calcula esto desde eventos que su webhook sí registra.'},
-  pruebas:{titulo:'Pruebas gratuitas',falta:'IMDAC no guarda qué curso eligió cada cuenta de prueba ni cuándo expira — ese campo (cursoPrueba / progreso) no existe en el modelo de datos actual.'},
   pruebasvip:{titulo:'Pruebas VIP',falta:'No existe un flujo de "prueba VIP por tiempo limitado" en IMDAC — ni el campo en miembros ni la lógica que lo otorgue.'},
 };
 function renderSinDatos(id){
@@ -232,6 +231,85 @@ function renderEncuesta(){
   return `<div class="page-head"><div><div class="pill-eyebrow">Ruta IMDAC · Datos reales</div><h1 class="page-h">Encuesta de clientes</h1><p class="page-sub">Respuestas anónimas de visitantes que terminaron su ruta de aprendizaje en IMDAC México.</p></div><button class="btn-add" onclick="reload()">Actualizar</button></div>
   <div class="stats">${statCard('Respuestas recibidas',list.length,'Sin datos personales','M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-6l-4 4v-4z')}${statCard('Ruta más reciente',list[0]?.recomendacion||'—','Según intereses seleccionados','M12 2l3 7h7l-5.5 4 2 7-6.5-4.2L5.5 20l2-7L2 9h7z')}</div>
   ${list.length?`<section class="survey-charts">${pastel('Perfil de los visitantes','Cómo se describen al iniciar su ruta.',list.map(e=>e.perfil))}${pastel('Interés o área de crecimiento','La segunda decisión de cada visitante.',list.map(e=>(e.respuestas||[])[1]))}${pastel('Modalidad preferida','Cómo prefieren tomar su capacitación.',list.map(e=>{const r=e.respuestas||[];return r[r.length-1];}))}</section><section class="survey-recent card"><div class="survey-recent-head"><h2>Respuestas recientes</h2><span>Detalle de las últimas ${list.length} respuestas</span></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Perfil</th><th>Intereses / respuestas</th><th>Recomendación</th></tr></thead><tbody>${list.map(e=>`<tr><td>${esc(fecha(e))}</td><td><b>${esc(e.perfil)}</b></td><td>${esc((e.respuestas||[]).join(' · ')||'—')}</td><td><span class="tag green">${esc(e.recomendacion)}</span></td></tr>`).join('')}</tbody></table></div></section>`:`<div class="card"><div class="empty"><b>Aún no hay respuestas</b><span>Cuando un visitante termine la ruta de IMDAC México, aparecerá aquí.</span></div></div>`}`;
+}
+
+/* ====== PRUEBAS GRATUITAS ======
+   Qué curso eligió cada cuenta como prueba gratuita (progreso/{uid}.cursoPrueba,
+   escrito por POST /curso-prueba en el webhook) y cuántas de esas cuentas
+   terminaron pagando (miembros/{uid}.estado==='Activo' -- mismo criterio que
+   usa el resto de este panel para "activo", ej. el Dashboard y Miembros VIP). */
+function fechaProgreso(p){
+  if(p?.cursoPruebaAt?.toDate)return p.cursoPruebaAt.toDate();
+  if(p?.cursoPruebaAt)return new Date(p.cursoPruebaAt);
+  return null;
+}
+function renderPruebas(){
+  const miembros=DATA.miembros||[];
+  const progreso=DATA.progreso||[];
+  const miembrosPorId=new Map(miembros.map(m=>[m.id,m]));
+  const cursosPorId=new Map((DATA.cursos||[]).map(c=>[c.id,c]));
+  const conPrueba=progreso.filter(p=>p.cursoPrueba);
+  const idsConPrueba=new Set(conPrueba.map(p=>p.id));
+  const totalCuentas=miembros.length;
+  const sinElegir=miembros.filter(m=>!idsConPrueba.has(m.id)).length;
+  const eligieronYPagaron=conPrueba.filter(p=>miembrosPorId.get(p.id)?.estado==='Activo').length;
+  const pagaronSinElegir=miembros.filter(m=>m.estado==='Activo'&&!idsConPrueba.has(m.id)).length;
+  const pct=totalCuentas?Math.round(conPrueba.length/totalCuentas*100):0;
+
+  const porCurso={};
+  conPrueba.forEach(p=>{porCurso[p.cursoPrueba]=(porCurso[p.cursoPrueba]||0)+1;});
+  const cursosTop=Object.entries(porCurso).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxCurso=cursosTop.length?cursosTop[0][1]:0;
+
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const claveDia=d=>d.toISOString().slice(0,10);
+  const dias=Array.from({length:14},(_,i)=>{const d=new Date(hoy);d.setDate(d.getDate()-(13-i));return d;});
+  const conteoPorDia={};
+  conPrueba.forEach(p=>{const f=fechaProgreso(p);if(!f)return;const d=new Date(f);d.setHours(0,0,0,0);const k=claveDia(d);conteoPorDia[k]=(conteoPorDia[k]||0)+1;});
+  const porDia=dias.map(d=>({d,count:conteoPorDia[claveDia(d)]||0}));
+  const maxDia=Math.max(1,...porDia.map(x=>x.count));
+
+  const ultimas=conPrueba.slice().sort((a,b)=>(fechaProgreso(b)?.getTime()||0)-(fechaProgreso(a)?.getTime()||0)).slice(0,12);
+  const filaPrueba=p=>{
+    const m=miembrosPorId.get(p.id);
+    const curso=cursosPorId.get(p.cursoPrueba);
+    const pagado=m?.estado==='Activo';
+    const f=fechaProgreso(p);
+    return `<tr>
+      <td><div class="t-cell"><div class="t-thumb" style="border-radius:9px;background:var(--rojo);color:#fff;display:grid;place-items:center;font-weight:700;font-family:var(--font-display)">${esc((m?.nombre||'?')[0].toUpperCase())}</div>
+        <span class="t-title">${esc(m?.nombre||'Cuenta eliminada')}<br><span style="font-weight:400;color:var(--muted);font-size:.78rem">${esc(m?.email||p.id)}</span></span></div></td>
+      <td>${esc(curso?.titulo||p.cursoPrueba)}</td>
+      <td>${pagado?'<span class="tag green">Activo</span>':'<span class="tag gray">Sin pagar</span>'}</td>
+      <td>${f?esc(f.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})):'—'}</td>
+    </tr>`;
+  };
+
+  return `<div class="page-head"><div><div class="pill-eyebrow">Ruta IMDAC · Datos reales</div><h1 class="page-h">Pruebas gratuitas</h1><p class="page-sub">Qué curso eligen las cuentas nuevas como prueba gratuita y cuántas de ellas terminan activando la membresía.</p></div><button class="btn-ghost" onclick="reload()">Actualizar</button></div>
+  <div class="stats">
+    ${kpiCard('Pruebas elegidas',conPrueba.length,`${pct}% de las cuentas registradas (${totalCuentas})`,'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z')}
+    ${kpiCard('Cuentas sin elegir',sinElegir,'Registradas y todavía sin seleccionar un curso.','M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z')}
+    ${kpiCard('Eligieron y ya pagaron',eligieronYPagaron,'Personas que eligieron una prueba y activaron su membresía.','M13 7h8m0 0v8m0-8l-8 8-4-4-6 6')}
+    ${kpiCard('Pagaron sin elegir curso',pagaronSinElegir,'Activaron la membresía sin usar una prueba.','M13 10V3L4 14h7v7l9-11h-7z')}
+  </div>
+  <div class="pruebas-cols">
+    <div class="card" style="padding:22px">
+      <h3 style="font-family:var(--font-display);font-size:1.02rem;margin:0 0 4px">Cursos más elegidos</h3>
+      <p style="font-size:.78rem;color:var(--muted);margin:0 0 16px">Preferencias de las personas que ya seleccionaron su prueba.</p>
+      ${cursosTop.length?cursosTop.map(([id,count])=>`<div class="pb-bar-row"><span class="pb-bar-label">${esc(cursosPorId.get(id)?.titulo||id)}</span><div class="pb-bar-track"><div class="pb-bar-fill" style="width:${maxCurso?Math.round(count/maxCurso*100):0}%"></div></div><b>${count}</b></div>`).join(''):'<div class="survey-empty">Aún no hay datos suficientes.</div>'}
+    </div>
+    <div class="card" style="padding:22px">
+      <h3 style="font-family:var(--font-display);font-size:1.02rem;margin:0 0 4px">Pruebas elegidas por día</h3>
+      <p style="font-size:.78rem;color:var(--muted);margin:0 0 16px">Últimos 14 días.</p>
+      <div class="pb-daychart">
+        ${porDia.map(({d,count})=>`<div class="pb-day" title="${count} prueba(s) el ${d.toLocaleDateString('es-MX')}"><div class="pb-day-bar" style="height:${count?Math.max(6,Math.round(count/maxDia*100)):2}%"></div><span>${d.getDate()}/${d.getMonth()+1}</span></div>`).join('')}
+      </div>
+    </div>
+  </div>
+  <section class="survey-recent card">
+    <div class="survey-recent-head"><h2>Últimas pruebas elegidas</h2><span>Elección de curso y estado actual de la membresía.</span></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Miembro</th><th>Curso elegido</th><th>Estado</th><th>Fecha</th></tr></thead>
+    <tbody>${ultimas.length?ultimas.map(filaPrueba).join(''):'<tr><td colspan="4"><div class="empty"><b>Aún no hay pruebas elegidas</b><span>Aparecerán aquí en cuanto un socio elija su curso gratuito.</span></div></td></tr>'}</tbody></table></div>
+  </section>`;
 }
 
 /* ====== DASHBOARD ====== */
@@ -2232,14 +2310,14 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
   // Modo real: arranca vacío y solo se llena con Firestore. El demo aplica únicamente sin Firebase.
-  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[],encuestas:[]};
-  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[]};return;}
+  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[],encuestas:[],progreso:[]};
+  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],progreso:[]};return;}
   // Cada colección se trae por separado y con su propio catch: una colección
   // sin reglas desplegadas todavía (ej. certificados, antes de pegar las
   // reglas nuevas en Firebase Console) no debe tumbar el resto del panel.
   const safeGet=(c)=>db.collection(c).get().catch(e=>{console.warn(`Firestore (${c}):`,e.message);return {docs:[]};});
   try{
-    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas','retos_visuales','tienda_articulos'];
+    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas','retos_visuales','tienda_articulos','progreso'];
     const snaps=await Promise.all(cols.map(safeGet));
     cols.forEach((c,i)=>{DATA[c]=snaps[i].docs.map(d=>({id:d.id,...d.data()}));});
     const foro=await safeGet('foro_temas');DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));

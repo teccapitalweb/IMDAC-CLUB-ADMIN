@@ -215,6 +215,19 @@ table.tbl tr:hover td{background:var(--base)}
 .survey-empty{height:160px;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:.85rem}.survey-recent{margin-top:4px}.survey-recent-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:20px 20px 12px}.survey-recent-head h2{margin:0}
 @media(max-width:1100px){.survey-charts{grid-template-columns:1fr 1fr}.survey-chart:last-child{grid-column:span 2}}@media(max-width:700px){.survey-charts{grid-template-columns:1fr}.survey-chart:last-child{grid-column:auto}.survey-chart-body{gap:14px}.survey-pie{width:112px;height:112px;flex-basis:112px}.survey-pie::before{inset:22px}.survey-recent-head{align-items:flex-start;flex-direction:column}}
 
+/* PRUEBAS GRATUITAS */
+.pruebas-cols{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;margin-bottom:22px}
+.pb-bar-row{display:grid;grid-template-columns:minmax(0,1fr) 110px 26px;align-items:center;gap:10px;margin-bottom:13px;font-size:.84rem}
+.pb-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.pb-bar-track{height:9px;border-radius:50px;background:var(--gris-100)}
+.pb-bar-fill{height:100%;border-radius:50px;background:var(--rojo);min-width:4px}
+.pb-bar-row b{font-family:var(--font-display);text-align:right}
+.pb-daychart{display:flex;align-items:flex-end;gap:6px;height:150px;padding-top:10px}
+.pb-day{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px}
+.pb-day-bar{width:100%;max-width:22px;border-radius:5px 5px 2px 2px;background:var(--rojo)}
+.pb-day span{font-size:.6rem;color:var(--muted);white-space:nowrap}
+@media(max-width:900px){.pruebas-cols{grid-template-columns:1fr}}
+
 /* Configuración: grid de tarjetas estilo DulceLab (Precios/Contacto/Administradores/Estado) */
 .cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:18px}
 .cfg-card{padding:26px}
