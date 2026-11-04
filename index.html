@@ -215,6 +215,16 @@ table.tbl tr:hover td{background:var(--base)}
 .survey-empty{height:160px;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:.85rem}.survey-recent{margin-top:4px}.survey-recent-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:20px 20px 12px}.survey-recent-head h2{margin:0}
 @media(max-width:1100px){.survey-charts{grid-template-columns:1fr 1fr}.survey-chart:last-child{grid-column:span 2}}@media(max-width:700px){.survey-charts{grid-template-columns:1fr}.survey-chart:last-child{grid-column:auto}.survey-chart-body{gap:14px}.survey-pie{width:112px;height:112px;flex-basis:112px}.survey-pie::before{inset:22px}.survey-recent-head{align-items:flex-start;flex-direction:column}}
 
+/* RESEÑAS */
+.resena-row{padding:16px 20px;border-top:1px solid var(--line)}
+.resena-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.resena-top b{font-family:var(--font-display);font-weight:600;font-size:.92rem}
+.resena-date{font-size:.76rem;color:var(--muted);white-space:nowrap}
+.resena-meta{font-size:.78rem;color:var(--muted);margin:3px 0 8px}
+.resena-comment{font-size:.88rem;line-height:1.5;margin:0}
+.resenas-clasif{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:22px}
+@media(max-width:900px){.resenas-clasif{grid-template-columns:1fr}}
+
 /* PRUEBAS GRATUITAS */
 .pruebas-cols{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;margin-bottom:22px}
 .pb-bar-row{display:grid;grid-template-columns:minmax(0,1fr) 110px 26px;align-items:center;gap:10px;margin-bottom:13px;font-size:.84rem}

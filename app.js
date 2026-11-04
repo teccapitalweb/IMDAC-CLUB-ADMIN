@@ -126,6 +126,7 @@ const NAV=[
   {id:"webinars",label:"Clases en vivo",group:"Contenido",icon:'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z'},
   {id:"material",label:"PDFs y material",group:"Contenido",icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'},
   {id:"certificados",label:"Certificados",group:"Contenido",icon:'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'},
+  {id:"resenas",label:"Reseñas",group:"Contenido",icon:'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z'},
   {id:"preguntas",label:"Quiz del Arquitecto",group:"Contenido",icon:'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'},
   {id:"retosvisuales",label:"Detecta el error",group:"Contenido",icon:'M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16a2 2 0 001.73 3z'},
   {id:"tienda",label:"Tienda de recompensas",group:"Contenido",icon:'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'},
@@ -194,7 +195,7 @@ function renderSection(sec){
   const R={dashboard:renderDashboard,cursos:renderCursos,webinars:renderWebinars,noticias:renderNoticias,
     material:renderMaterial,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig,verpanel:renderVerPanel,
     certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,retosvisuales:renderRetosVisuales,tienda:renderTienda,
-    metricas:renderMetricas,pruebas:renderPruebas,pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:renderEncuesta};
+    metricas:renderMetricas,pruebas:renderPruebas,pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:renderEncuesta,resenas:renderResenas};
   document.getElementById('content').innerHTML=`<div class="section active">${(R[sec]||renderDashboard)()}</div>`;
 }
 /* Secciones que existen en el nav de DulceLab pero cuya fuente de datos no
@@ -419,6 +420,109 @@ function renderMetricas(){
       ${dispDatos.length?`<div class="survey-chart-body"><div class="survey-pie" style="--pie:conic-gradient(${segmentos})"><strong>${visitas}</strong><span>visitas</span></div><ul class="survey-legend">${dispDatos.map(([k,n])=>`<li><i style="background:${dispColores[k]}"></i><span>${dispLabel[k]}</span><b>${n} · ${visitas?Math.round(n/visitas*100):0}%</b></li>`).join('')}</ul></div>`:'<div class="survey-empty">Aún no hay visitas en este periodo.</div>'}
     </div>
   </div>`;
+}
+
+/* ====== RESEÑAS DE CURSOS ======
+   Lo que opinan los socios de los cursos que terminaron: estrellas
+   (1-5) + comentario opcional, escrito por el webhook vía POST
+   /resena-curso (una sola reseña por socio por curso, para siempre).
+   Solo el admin las lee -- igual patrón que Pruebas gratuitas/Métricas. */
+let _resenasFiltroCurso='todos', _resenasFiltroEstrellas='todas', _resenasSoloComentario=false;
+function setResenasFiltroCurso(v){_resenasFiltroCurso=v;renderSection('resenas');}
+function setResenasFiltroEstrellas(v){_resenasFiltroEstrellas=v;renderSection('resenas');}
+function toggleResenasSoloComentario(checked){_resenasSoloComentario=checked;renderSection('resenas');}
+function estrellasHTML(n){return `<span style="color:#f5b301;letter-spacing:1px">${'★'.repeat(n)}</span><span style="color:var(--line);letter-spacing:1px">${'★'.repeat(5-n)}</span>`;}
+function fechaResena(r){
+  if(r?.fecha?.toDate)return r.fecha.toDate();
+  if(r?.fecha)return new Date(r.fecha);
+  return null;
+}
+function renderResenas(){
+  const todas=DATA.resenas||[];
+  const total=todas.length;
+  const promedio=total?(todas.reduce((s,r)=>s+(Number(r.estrellas)||0),0)/total):0;
+  const conComentario=todas.filter(r=>String(r.comentario||'').trim()).length;
+  const pctComentario=total?Math.round(conComentario/total*100):0;
+  const hace7=new Date();hace7.setDate(hace7.getDate()-7);
+  const ultimos7=todas.filter(r=>{const f=fechaResena(r);return f&&f>=hace7;}).length;
+
+  const porCurso={};
+  todas.forEach(r=>{
+    const k=r.cursoId||'—';
+    if(!porCurso[k])porCurso[k]={cursoId:k,titulo:r.cursoTitulo||k,count:0,suma:0};
+    porCurso[k].count++;porCurso[k].suma+=Number(r.estrellas)||0;
+  });
+  const cursos=Object.values(porCurso).map(c=>({...c,avg:c.suma/c.count}));
+  const clasifica=c=>c.count<3?'pocas':c.avg>=4.5?'excelente':c.avg>=3.5?'mejor':'mejorar';
+  const excelentes=cursos.filter(c=>clasifica(c)==='excelente');
+  const mejorCalificados=cursos.filter(c=>clasifica(c)==='mejor');
+  const porMejorar=cursos.filter(c=>clasifica(c)==='mejorar');
+  const pocasResenas=cursos.filter(c=>clasifica(c)==='pocas');
+  const colorClasif={excelente:'#16a34a',mejor:'#3b82f6',mejorar:'var(--rojo)',pocas:'var(--muted)'};
+  const cursosOrdenados=cursos.slice().sort((a,b)=>b.avg-a.avg);
+
+  const porEstrella=[5,4,3,2,1].map(n=>{const count=todas.filter(r=>Number(r.estrellas)===n).length;return {n,count,pct:total?Math.round(count/total*100):0};});
+
+  let lista=todas.slice();
+  if(_resenasFiltroCurso!=='todos')lista=lista.filter(r=>r.cursoId===_resenasFiltroCurso);
+  if(_resenasFiltroEstrellas!=='todas')lista=lista.filter(r=>Number(r.estrellas)===Number(_resenasFiltroEstrellas));
+  if(_resenasSoloComentario)lista=lista.filter(r=>String(r.comentario||'').trim());
+  lista=lista.sort((a,b)=>(fechaResena(b)?.getTime()||0)-(fechaResena(a)?.getTime()||0));
+
+  const filaResena=r=>{
+    const f=fechaResena(r);
+    const comentario=String(r.comentario||'').trim();
+    return `<div class="resena-row">
+      <div class="resena-top"><b>${esc(r.nombre||'Socio IMDAC')} · ${estrellasHTML(Number(r.estrellas)||0)}</b><span class="resena-date">${f?esc(f.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})+' · '+f.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})):'—'}</span></div>
+      <p class="resena-meta">${esc(r.cursoTitulo||r.cursoId||'—')} · ${esc(r.email||'—')}</p>
+      <p class="resena-comment">${comentario?esc(comentario):'<i style="color:var(--muted)">Solo calificó, sin comentario.</i>'}</p>
+    </div>`;
+  };
+
+  return `<div class="page-head"><div><div class="pill-eyebrow">Ruta IMDAC · Datos reales</div><h1 class="page-h">Reseñas</h1><p class="page-sub">Lo que opinan tus alumnos de los cursos que terminaron: estrellas de 1 a 5 y, si quisieron, un comentario. Solo tú las ves.</p></div><button class="btn-ghost" onclick="reload()">Actualizar</button></div>
+  <div class="stats">
+    ${kpiCard('Calificación promedio',total?promedio.toFixed(1)+'★':'—','de 5 estrellas · entre todos los cursos','M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z')}
+    ${kpiCard('Reseñas recibidas',total,`${ultimos7} en los últimos 7 días`,'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-6l-4 4v-4z')}
+    ${kpiCard('Con comentario',conComentario,`${pctComentario}% dejó un comentario`,'M8 10h.01M12 10h.01M16 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z')}
+    ${kpiCard('Cursos calificados',cursos.length,`${excelentes.length} excelentes · ${porMejorar.length} por mejorar`,'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253')}
+  </div>
+  <div class="card" style="padding:22px;margin-bottom:22px">
+    <h3 style="font-family:var(--font-display);font-size:1.02rem;margin:0 0 4px">¿Cómo califican tus cursos?</h3>
+    <p style="font-size:.78rem;color:var(--muted);margin:0 0 6px">Calificación promedio de cada curso. Un curso necesita al menos 3 reseñas para clasificarse.</p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-size:.76rem;color:var(--muted)">
+      <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#16a34a;margin-right:5px"></i>Excelentes · 4.5 o más</span>
+      <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;margin-right:5px"></i>Mejor calificados · de 3.5 a 4.4</span>
+      <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--rojo);margin-right:5px"></i>Por mejorar · menos de 3.5</span>
+      <span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:5px"></i>Pocas reseñas</span>
+    </div>
+    ${cursosOrdenados.length?cursosOrdenados.map(c=>`<div class="pb-bar-row"><span class="pb-bar-label">${esc(c.titulo)}</span><div class="pb-bar-track"><div class="pb-bar-fill" style="width:${Math.round(c.avg/5*100)}%;background:${colorClasif[clasifica(c)]}"></div></div><b>${c.avg.toFixed(1)}</b></div>`).join(''):'<div class="survey-empty">Aún no hay reseñas.</div>'}
+  </div>
+  <div class="resenas-clasif">
+    <div class="card" style="padding:20px"><b style="color:#16a34a;display:flex;align-items:center;gap:6px"><i style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block"></i>Excelentes (${excelentes.length})</b><p style="font-size:.78rem;color:var(--muted);margin:6px 0 10px">4.5 estrellas o más</p>${excelentes.length?excelentes.map(c=>`<div style="font-size:.84rem;margin-bottom:4px">${esc(c.titulo)} <b>${c.avg.toFixed(1)}★</b></div>`).join(''):'<p style="font-size:.82rem;color:var(--muted)">Ningún curso por ahora.</p>'}</div>
+    <div class="card" style="padding:20px"><b style="color:#3b82f6;display:flex;align-items:center;gap:6px"><i style="width:8px;height:8px;border-radius:50%;background:#3b82f6;display:inline-block"></i>Mejor calificados (${mejorCalificados.length})</b><p style="font-size:.78rem;color:var(--muted);margin:6px 0 10px">de 3.5 a 4.4 estrellas</p>${mejorCalificados.length?mejorCalificados.map(c=>`<div style="font-size:.84rem;margin-bottom:4px">${esc(c.titulo)} <b>${c.avg.toFixed(1)}★</b></div>`).join(''):'<p style="font-size:.82rem;color:var(--muted)">Ningún curso por ahora.</p>'}</div>
+    <div class="card" style="padding:20px"><b style="color:var(--rojo);display:flex;align-items:center;gap:6px"><i style="width:8px;height:8px;border-radius:50%;background:var(--rojo);display:inline-block"></i>Por mejorar (${porMejorar.length})</b><p style="font-size:.78rem;color:var(--muted);margin:6px 0 10px">menos de 3.5 estrellas</p>${porMejorar.length?porMejorar.map(c=>`<div style="font-size:.84rem;margin-bottom:4px">${esc(c.titulo)} <b>${c.avg.toFixed(1)}★</b></div>`).join(''):'<p style="font-size:.82rem;color:var(--muted)">Ningún curso por ahora.</p>'}</div>
+  </div>
+  ${pocasResenas.length?`<p style="font-size:.8rem;color:var(--muted);margin:-6px 0 22px">Con pocas reseñas todavía (${pocasResenas.length}): ${pocasResenas.map(c=>`${esc(c.titulo)} (${c.avg.toFixed(1)}★, ${c.count})`).join(' · ')}</p>`:''}
+  <div class="card" style="padding:22px;margin-bottom:22px">
+    <h3 style="font-family:var(--font-display);font-size:1.02rem;margin:0 0 4px">Estrellas recibidas</h3>
+    <p style="font-size:.78rem;color:var(--muted);margin:0 0 16px">Cuántas reseñas hay de cada calificación.</p>
+    ${porEstrella.map(e=>`<div class="pb-bar-row"><span class="pb-bar-label">${e.n}★</span><div class="pb-bar-track"><div class="pb-bar-fill" style="width:${e.pct}%;background:${e.n===5?'#f5b301':'var(--rojo)'}"></div></div><b>${e.count} · ${e.pct}%</b></div>`).join('')}
+  </div>
+  <section class="survey-recent card">
+    <div class="survey-recent-head"><h2>Comentarios y calificaciones (${lista.length})</h2></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;padding:0 20px 16px">
+      <select onchange="setResenasFiltroCurso(this.value)" style="padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text)">
+        <option value="todos">Todos los cursos</option>
+        ${cursos.map(c=>`<option value="${esc(c.cursoId)}" ${_resenasFiltroCurso===c.cursoId?'selected':''}>${esc(c.titulo)}</option>`).join('')}
+      </select>
+      <select onchange="setResenasFiltroEstrellas(this.value)" style="padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text)">
+        <option value="todas">Todas las estrellas</option>
+        ${[5,4,3,2,1].map(n=>`<option value="${n}" ${_resenasFiltroEstrellas==String(n)?'selected':''}>${n}★</option>`).join('')}
+      </select>
+      <label style="display:flex;align-items:center;gap:7px;font-size:.84rem;color:var(--muted)"><input type="checkbox" ${_resenasSoloComentario?'checked':''} onchange="toggleResenasSoloComentario(this.checked)"> Solo con comentario</label>
+    </div>
+    ${lista.length?lista.map(filaResena).join(''):'<div class="empty"><b>Sin resultados</b><span>Aún no hay reseñas que coincidan con este filtro.</span></div>'}
+  </section>`;
 }
 
 /* ====== DASHBOARD ====== */
@@ -2419,14 +2523,14 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
   // Modo real: arranca vacío y solo se llena con Firestore. El demo aplica únicamente sin Firebase.
-  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[],encuestas:[],progreso:[],analytics_visitas:[]};
-  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],progreso:[],analytics_visitas:[]};return;}
+  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[],encuestas:[],progreso:[],analytics_visitas:[],resenas:[]};
+  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],progreso:[],analytics_visitas:[],resenas:[]};return;}
   // Cada colección se trae por separado y con su propio catch: una colección
   // sin reglas desplegadas todavía (ej. certificados, antes de pegar las
   // reglas nuevas en Firebase Console) no debe tumbar el resto del panel.
   const safeGet=(c)=>db.collection(c).get().catch(e=>{console.warn(`Firestore (${c}):`,e.message);return {docs:[]};});
   try{
-    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas','retos_visuales','tienda_articulos','progreso'];
+    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas','retos_visuales','tienda_articulos','progreso','resenas'];
     const snaps=await Promise.all(cols.map(safeGet));
     cols.forEach((c,i)=>{DATA[c]=snaps[i].docs.map(d=>({id:d.id,...d.data()}));});
     const foro=await safeGet('foro_temas');DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
