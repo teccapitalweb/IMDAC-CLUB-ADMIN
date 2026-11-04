@@ -133,6 +133,7 @@ const NAV=[
   {id:"notificaciones",label:"Notificaciones",group:"Comunicación",icon:'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'},
   {id:"miembros",label:"Miembros VIP",group:"Comunidad",icon:'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'},
   {id:"pagos",label:"Pagos",group:"Comunidad",icon:'M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'},
+  {id:"monedas",label:"Monedas",group:"Comunidad",icon:'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 10v2M21 12a9 9 0 11-18 0 9 9 0 0118 0z'},
   {id:"noticias",label:"Descubre algo nuevo",group:"Comunidad",icon:'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9'},
   {id:"foro",label:"Foro",group:"Comunidad",icon:'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z'},
   {id:"directorio",label:"Directorio",group:"Comunidad",icon:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'},
@@ -195,7 +196,7 @@ function renderSection(sec){
   const R={dashboard:renderDashboard,cursos:renderCursos,webinars:renderWebinars,noticias:renderNoticias,
     material:renderMaterial,miembros:renderMiembros,foro:renderForo,notificaciones:renderNotificaciones,configuracion:renderConfig,verpanel:renderVerPanel,
     certificados:renderCertificados,directorio:renderDirectorioAdmin,preguntas:renderPreguntas,retosvisuales:renderRetosVisuales,tienda:renderTienda,
-    metricas:renderMetricas,pruebas:renderPruebas,pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:renderEncuesta,resenas:renderResenas};
+    metricas:renderMetricas,pruebas:renderPruebas,pruebasvip:()=>renderSinDatos('pruebasvip'),pagos:renderPagos,encuesta:renderEncuesta,resenas:renderResenas,monedas:renderMonedas};
   document.getElementById('content').innerHTML=`<div class="section active">${(R[sec]||renderDashboard)()}</div>`;
 }
 /* Secciones que existen en el nav de DulceLab pero cuya fuente de datos no
@@ -522,6 +523,186 @@ function renderResenas(){
       <label style="display:flex;align-items:center;gap:7px;font-size:.84rem;color:var(--muted)"><input type="checkbox" ${_resenasSoloComentario?'checked':''} onchange="toggleResenasSoloComentario(this.checked)"> Solo con comentario</label>
     </div>
     ${lista.length?lista.map(filaResena).join(''):'<div class="empty"><b>Sin resultados</b><span>Aún no hay reseñas que coincidan con este filtro.</span></div>'}
+  </section>`;
+}
+
+/* ====== MONEDAS: regalos directos y cupones (como Alintec Food) ======
+   Mismo saldo de monedas que ya gana el socio jugando en Zona de Retos
+   -- esto solo agrega dos formas más de llenarlo: un regalo directo a
+   una cuenta, o un cupón de clave que cualquiera canjea desde el Club
+   (Configuración). Un segundo tipo de cupón no toca monedas: da acceso
+   temporal a Herramientas Pro sin pedir la membresía completa. */
+let _monedasTipoCupon='monedas', _monedasAudiencia='ambos', _monedasVenceHoras=168, _monedasBusqueda='';
+const MONEDAS_VENCE_OPCIONES=[[0,'No vence'],[0.25,'En 15 minutos'],[0.5,'En 30 minutos'],[1,'En 1 hora'],[6,'En 6 horas'],[24,'En 24 horas'],[72,'En 3 días'],[168,'En 7 días'],[360,'En 15 días'],[720,'En 30 días']];
+function setMonedasTipoCupon(t){_monedasTipoCupon=t;renderSection('monedas');}
+function setMonedasAudiencia(a){_monedasAudiencia=a;renderSection('monedas');}
+function setMonedasVence(h){_monedasVenceHoras=h;renderSection('monedas');}
+function setMonedasBusqueda(v){_monedasBusqueda=v;renderSection('monedas');}
+function fechaMonedas(x){
+  if(x?.toDate)return x.toDate();
+  if(x?._seconds)return new Date(x._seconds*1000);
+  if(x)return new Date(x);
+  return null;
+}
+async function crearCuponUI(){
+  const clave=(document.getElementById('mon-clave')?.value||'').trim();
+  const valor=+(document.getElementById('mon-valor')?.value)||0;
+  const maxUsos=(document.getElementById('mon-maxusos')?.value||'').trim();
+  if(valor<=0)return toast(_monedasTipoCupon==='monedas'?'Indica cuántas monedas regala':'Indica cuántas horas de acceso da',{type:'err'});
+  try{
+    const body={tipo:_monedasTipoCupon,clave,audiencia:_monedasAudiencia,venceHoras:_monedasVenceHoras,maxUsos:maxUsos||''};
+    if(_monedasTipoCupon==='monedas')body.monedas=valor; else body.horas=valor;
+    const r=await apiFetch('/admin/cupon-crear',{body});
+    toast(`¡Cupón ${r.clave} creado!`);
+    reload();
+  }catch(e){ toast(e.message||'No se pudo crear el cupón',{type:'err'}); }
+}
+async function pausarCuponUI(clave,activo){
+  try{
+    await apiFetch('/admin/cupon-pausar',{body:{clave,activo:!activo}});
+    toast(activo?'Cupón pausado':'Cupón reanudado');
+    reload();
+  }catch(e){ toast(e.message||'No se pudo actualizar el cupón',{type:'err'}); }
+}
+function copiarMensajeCupon(c){
+  const desc=c.tipo==='monedas'?`${c.monedas} monedas para canjear en la Tienda de Recompensas`:`acceso a Herramientas Pro por ${c.horasPro} horas`;
+  const vence=fechaMonedas(c.vence);
+  const texto=`🎁 IMDAC te regala ${desc}\n\nEntra al Club → Configuración → "¿Tienes un cupón?" y escribe esta clave:\n${c.clave}\n\n${vence?('Válido hasta: '+vence.toLocaleDateString('es-MX')+' '+vence.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})):'Sin fecha límite'}\n\nhttps://teccapitalweb.github.io/IMDAC-CLUB/`;
+  navigator.clipboard.writeText(texto).then(()=>toast('Mensaje copiado, pégalo en WhatsApp')).catch(()=>toast('No se pudo copiar',{type:'err'}));
+}
+async function verCanjesCupon(clave){
+  document.getElementById('modal-content').innerHTML=`<div class="modal-head"><h3>Canjes de ${esc(clave)}</h3><button class="modal-x" onclick="closeModal()">✕</button></div><div class="modal-body"><div class="empty"><b>Cargando…</b></div></div>`;
+  document.getElementById('modal').classList.add('open');
+  try{
+    const r=await apiFetch(`/admin/cupon/${clave}/canjes`,{method:'GET'});
+    const canjes=r.canjes||[];
+    const miembrosPorId=new Map((DATA.miembros||[]).map(m=>[m.id,m]));
+    document.getElementById('modal-content').innerHTML=`<div class="modal-head"><h3>Canjes de ${esc(clave)} (${canjes.length})</h3><button class="modal-x" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">${canjes.length?canjes.map(c=>{const m=miembrosPorId.get(c.uid);const f=fechaMonedas(c.fecha);return `<div style="padding:10px 0;border-top:1px solid var(--line)"><b>${esc(m?.nombre||c.uid)}</b><span style="color:var(--muted);font-size:.82rem;display:block">${esc(m?.email||'')}${f?' · '+esc(f.toLocaleDateString('es-MX')):''}</span></div>`;}).join(''):'<div class="empty"><b>Nadie lo ha canjeado todavía</b></div>'}
+    <div class="modal-foot"><button class="btn-ghost" onclick="closeModal()">Cerrar</button></div></div>`;
+  }catch(e){
+    document.getElementById('modal-content').innerHTML=`<div class="modal-body"><div class="empty"><b>No se pudo cargar</b></div><div class="modal-foot"><button class="btn-ghost" onclick="closeModal()">Cerrar</button></div></div>`;
+  }
+}
+function abrirRegalarMonedas(uid,nombre){
+  document.getElementById('modal-content').innerHTML=`<div class="modal-head"><h3>Regalar monedas</h3><button class="modal-x" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <p style="color:var(--muted);margin:0 0 14px">A <b>${esc(nombre||'este socio')}</b></p>
+      <label style="font-size:.82rem;color:var(--muted)">Monedas a regalar</label>
+      <input id="rm-monedas" type="number" min="1" value="100" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--base);color:var(--text);margin-top:6px;box-sizing:border-box">
+      <div class="modal-foot" style="margin-top:18px"><button class="btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn-save" onclick="confirmarRegalarMonedas('${uid}')">Regalar</button></div>
+    </div>`;
+  document.getElementById('modal').classList.add('open');
+}
+async function confirmarRegalarMonedas(uid){
+  const monedas=+(document.getElementById('rm-monedas')?.value)||0;
+  if(monedas<=0)return toast('Indica una cantidad válida',{type:'err'});
+  try{
+    await apiFetch('/admin/regalar-monedas',{body:{uid,monedas}});
+    toast(`¡${monedas} monedas regaladas!`);
+    closeModal();
+    reload();
+  }catch(e){ toast(e.message||'No se pudo regalar',{type:'err'}); }
+}
+function renderMonedas(){
+  const cupones=(DATA.cupones||[]).slice().sort((a,b)=>(fechaMonedas(b.creado)?.getTime()||0)-(fechaMonedas(a.creado)?.getTime()||0));
+  const regalos=(DATA.regalos_monedas||[]).slice().sort((a,b)=>(fechaMonedas(b.fecha)?.getTime()||0)-(fechaMonedas(a.fecha)?.getTime()||0));
+  const progresoPorId=new Map((DATA.progreso||[]).map(p=>[p.id,p]));
+  const totalRegalado=regalos.reduce((s,r)=>s+(Number(r.monedas)||0),0);
+  const cuentasConRegalo=new Set(regalos.map(r=>r.uid)).size;
+  const cuponesActivos=cupones.filter(c=>c.activo).length;
+  const canjesTotales=cupones.reduce((s,c)=>s+(Number(c.usos)||0),0);
+  const totalCuentas=(DATA.miembros||[]).length;
+
+  const audienciaLabel={ambos:'Cualquier cuenta',no_vip:'Solo plan gratuito',vip:'Solo miembros VIP'};
+  const filaCupon=c=>{
+    const vence=fechaMonedas(c.vence);
+    const vencido=vence&&vence<new Date();
+    const agotado=c.maxUsos!=null&&Number(c.usos||0)>=Number(c.maxUsos);
+    const estado=!c.activo?'<span class="tag gray">Pausado</span>':vencido?'<span class="tag gray">Vencido</span>':agotado?'<span class="tag gray">Agotado</span>':'<span class="tag green">Activo</span>';
+    const desc=c.tipo==='monedas'?`${c.monedas} monedas`:`${c.horasPro}h de Herramientas Pro`;
+    return `<div class="resena-row">
+      <div class="resena-top"><b>${esc(c.clave)}</b>${estado}</div>
+      <p class="resena-meta">${desc} · ${esc(audienciaLabel[c.audiencia]||'Cualquier cuenta')} · ${vence?('vence '+esc(vence.toLocaleDateString('es-MX'))):'sin vencimiento'}</p>
+      <p class="resena-comment">${c.maxUsos!=null?`${c.usos||0} de ${c.maxUsos} canjes`:`${c.usos||0} canjes`}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn-ghost" style="padding:7px 14px;font-size:.8rem" onclick='copiarMensajeCupon(${JSON.stringify(c).replace(/'/g,"&#39;")})'>Copiar mensaje</button>
+        <button class="btn-ghost" style="padding:7px 14px;font-size:.8rem" onclick="verCanjesCupon('${esc(c.clave)}')">Ver quién</button>
+        <button class="btn-ghost" style="padding:7px 14px;font-size:.8rem" onclick="pausarCuponUI('${esc(c.clave)}',${!!c.activo})">${c.activo?'Pausar':'Reanudar'}</button>
+      </div>
+    </div>`;
+  };
+
+  const filaRegalo=r=>{
+    const f=fechaMonedas(r.fecha);
+    const saldo=progresoPorId.get(r.uid);
+    return `<div class="resena-row">
+      <div class="resena-top"><b>${esc(r.nombre||'Socio IMDAC')}</b><span class="resena-date">${f?esc(f.toLocaleDateString('es-MX')):'—'}</span></div>
+      <p class="resena-meta">${esc(r.email||'—')} · +${r.monedas} monedas · ${r.origen==='admin'?'regalo directo':'cupón '+esc(String(r.origen||'').replace('cupon:',''))}</p>
+      <p class="resena-comment">Saldo actual: <b>${saldo?Number(saldo.monedas)||0:'—'}</b> monedas</p>
+    </div>`;
+  };
+
+  let cuentas=(DATA.miembros||[]).slice();
+  if(_monedasBusqueda.trim()){
+    const q=_monedasBusqueda.toLowerCase();
+    cuentas=cuentas.filter(m=>(m.nombre||'').toLowerCase().includes(q)||(m.email||'').toLowerCase().includes(q));
+  }
+  cuentas=cuentas.slice(0,30);
+  const filaCuenta=m=>{
+    const p=progresoPorId.get(m.id);
+    const activo=m.estado==='Activo';
+    return `<div class="resena-row">
+      <div class="resena-top"><b>${esc(m.nombre||'—')}</b>${activo?'<span class="tag green">VIP</span>':'<span class="tag gray">Gratis</span>'}</div>
+      <p class="resena-meta">${esc(m.email||'—')} · ${p?Number(p.monedas)||0:0} monedas</p>
+      <button class="btn-ghost" style="margin-top:6px" onclick="abrirRegalarMonedas('${m.id}','${esc(m.nombre||'')}')">🎁 Regalar monedas</button>
+    </div>`;
+  };
+
+  return `<div class="page-head"><div><div class="pill-eyebrow">Ruta IMDAC · Datos reales</div><h1 class="page-h">Monedas</h1><p class="page-sub">Regala monedas a cuentas nuevas. Cada socio las canjea en la Tienda de Recompensas, o usa un cupón para acceso temporal a Herramientas Pro. Aquí ves a quién se las regalaste.</p></div><button class="btn-ghost" onclick="reload()">Actualizar</button></div>
+  <div class="stats">
+    ${kpiCard('Cuentas',totalCuentas,'Registradas en la plataforma','M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z')}
+    ${kpiCard('Monedas regaladas',totalRegalado,`${regalos.length} regalo${regalos.length!==1?'s':''} en total`,'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 10v2M21 12a9 9 0 11-18 0 9 9 0 0118 0z')}
+    ${kpiCard('Cuentas con regalo',cuentasConRegalo,`${totalCuentas?Math.round(cuentasConRegalo/totalCuentas*100):0}% de las cuentas`,'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z')}
+    ${kpiCard('Cupones activos',cuponesActivos,`${canjesTotales} canje${canjesTotales!==1?'s':''} en total`,'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z')}
+  </div>
+  <div class="card" style="padding:22px;margin-bottom:22px">
+    <h3 style="font-family:var(--font-display);font-size:1.02rem;margin:0 0 4px">Cupones (monedas y Herramientas Pro)</h3>
+    <p style="font-size:.78rem;color:var(--muted);margin:0 0 18px">Creas una clave, la compartes en tu canal de WhatsApp y cada persona la canjea una sola vez, desde Configuración en el Club.</p>
+    <div style="font-size:.84rem;font-weight:700;margin-bottom:8px">¿Qué regala este cupón?</div>
+    <div class="live-filters" style="margin-bottom:14px">
+      <button class="${_monedasTipoCupon==='monedas'?'active':''}" onclick="setMonedasTipoCupon('monedas')">Monedas para materiales</button>
+      <button class="${_monedasTipoCupon==='herramientas_pro'?'active':''}" onclick="setMonedasTipoCupon('herramientas_pro')">Acceso a Herramientas Pro por tiempo</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;align-items:end;margin-bottom:18px">
+      <div class="field"><label>Clave (vacía = al azar)</label><input id="mon-clave" placeholder="Ej.: CANAL100" style="text-transform:uppercase"></div>
+      <div class="field"><label>${_monedasTipoCupon==='monedas'?'Monedas':'Horas de acceso'}</label><input id="mon-valor" type="number" min="1" value="${_monedasTipoCupon==='monedas'?'100':'24'}"></div>
+      <div class="field"><label>Máximo de personas (vacío = todas)</label><input id="mon-maxusos" type="number" min="1" placeholder="Todas"></div>
+      <button class="btn-add" onclick="crearCuponUI()">Crear cupón</button>
+    </div>
+    <div style="font-size:.84rem;font-weight:700;margin-bottom:8px">¿A quién le llega este beneficio?</div>
+    <div class="live-filters" style="margin-bottom:14px">
+      <button class="${_monedasAudiencia==='ambos'?'active':''}" onclick="setMonedasAudiencia('ambos')">Ambos (gratuitos y VIP)</button>
+      <button class="${_monedasAudiencia==='no_vip'?'active':''}" onclick="setMonedasAudiencia('no_vip')">Miembros no VIP (plan gratuito)</button>
+      <button class="${_monedasAudiencia==='vip'?'active':''}" onclick="setMonedasAudiencia('vip')">Miembros VIP (ya pagaron)</button>
+    </div>
+    <div style="font-size:.84rem;font-weight:700;margin-bottom:8px">¿Hasta cuándo se puede canjear este cupón?</div>
+    <div class="live-filters" style="margin-bottom:4px">
+      ${MONEDAS_VENCE_OPCIONES.map(([h,label])=>`<button class="${_monedasVenceHoras===h?'active':''}" onclick="setMonedasVence(${h})">${label}</button>`).join('')}
+    </div>
+  </div>
+  <section class="survey-recent card" style="margin-bottom:22px">
+    <div class="survey-recent-head"><h2>Cupones creados (${cupones.length})</h2></div>
+    ${cupones.length?cupones.map(filaCupon).join(''):'<div class="empty"><b>Aún no has creado ningún cupón</b></div>'}
+  </section>
+  <section class="survey-recent card" style="margin-bottom:22px">
+    <div class="survey-recent-head"><h2>Historial de regalos (${regalos.length})</h2></div>
+    ${regalos.length?regalos.slice(0,30).map(filaRegalo).join(''):'<div class="empty"><b>Aún no le has regalado monedas a nadie</b></div>'}
+  </section>
+  <section class="survey-recent card">
+    <div class="survey-recent-head"><h2>Cuentas (${totalCuentas})</h2></div>
+    <div style="padding:0 20px 16px"><input value="${esc(_monedasBusqueda)}" oninput="setMonedasBusqueda(this.value)" placeholder="Buscar por nombre o correo…" style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--base);color:var(--text);box-sizing:border-box"></div>
+    ${cuentas.length?cuentas.map(filaCuenta).join(''):'<div class="empty"><b>Sin resultados</b></div>'}
   </section>`;
 }
 
@@ -2523,14 +2704,14 @@ function doLogout(){if(FB_OK)auth.signOut();else{CURRENT_USER=null;document.body
 async function reload(){await loadData();renderSection(currentSection);}
 async function loadData(){
   // Modo real: arranca vacío y solo se llena con Firestore. El demo aplica únicamente sin Firebase.
-  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[],encuestas:[],progreso:[],analytics_visitas:[],resenas:[]};
-  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],progreso:[],analytics_visitas:[],resenas:[]};return;}
+  DATA={cursos:[],webinars:[],noticias:[],material:[],foro:[],miembros:[],notificaciones:[],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],retos_visuales:[],tienda_articulos:[],encuestas:[],progreso:[],analytics_visitas:[],resenas:[],cupones:[],regalos_monedas:[]};
+  if(!FB_OK){DATA={cursos:[...DEMO.cursos],webinars:[...DEMO.webinars],noticias:[...DEMO.noticias],material:[...DEMO.material],foro:[...DEMO.foro],miembros:[...DEMO.miembros],notificaciones:[...DEMO.notificaciones],directorio:[],certificados:[],datos_curiosos:[],preguntas:[],progreso:[],analytics_visitas:[],resenas:[],cupones:[],regalos_monedas:[]};return;}
   // Cada colección se trae por separado y con su propio catch: una colección
   // sin reglas desplegadas todavía (ej. certificados, antes de pegar las
   // reglas nuevas en Firebase Console) no debe tumbar el resto del panel.
   const safeGet=(c)=>db.collection(c).get().catch(e=>{console.warn(`Firestore (${c}):`,e.message);return {docs:[]};});
   try{
-    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas','retos_visuales','tienda_articulos','progreso','resenas'];
+    const cols=['cursos','webinars','noticias','material','directorio','certificados','datos_curiosos','preguntas','retos_visuales','tienda_articulos','progreso','resenas','cupones','regalos_monedas'];
     const snaps=await Promise.all(cols.map(safeGet));
     cols.forEach((c,i)=>{DATA[c]=snaps[i].docs.map(d=>({id:d.id,...d.data()}));});
     const foro=await safeGet('foro_temas');DATA.foro=foro.docs.map(d=>({id:d.id,...d.data()}));
